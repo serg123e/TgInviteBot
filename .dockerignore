@@ -1,0 +1,16 @@
+.git
+.gitignore
+.env*
+!.env.example
+*.md
+tests/
+scripts/
+data/
+__pycache__/
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/

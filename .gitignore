@@ -1,0 +1,32 @@
+__pycache__/
+*.py[cod]
+.env
+.env.deploy
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.pytest_cache/
+data/
+backups/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Coverage & caches
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Pyenv
+.python-version
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

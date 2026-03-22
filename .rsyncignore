@@ -1,0 +1,15 @@
+.git
+__pycache__
+*.pyc
+.env
+.env.deploy
+data/
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov/
+tests/
+PLAN.md
+.claude
+.python-version
