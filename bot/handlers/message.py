@@ -4,6 +4,7 @@ import logging
 
 from aiogram import Bot, F, Router
 from aiogram.enums import ChatType
+from aiogram.filters import Command
 from aiogram.types import Message
 
 from bot.db import members
@@ -11,6 +12,12 @@ from bot.services import onboarding
 
 log = logging.getLogger(__name__)
 router = Router(name="message")
+
+
+@router.message(Command("chatid"))
+async def on_chatid_command(message: Message) -> None:
+    """Reply with the current chat's ID (useful for setup)."""
+    await message.reply(f"Chat ID: <code>{message.chat.id}</code>")
 
 
 @router.message(F.text, F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}))
