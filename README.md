@@ -1,39 +1,39 @@
 # Telegram Onboarding Bot
 
-Бот для автоматического онбординга новых участников в Telegram-группах. Требует от новых участников представиться текстом, проверяет ответ через AI (OpenAI) и удаляет тех, кто не ответил в отведённое время.
+A bot for automatic onboarding of new members in Telegram groups. It requires newcomers to introduce themselves via text, validates responses using AI (OpenAI), and removes those who fail to respond within the allotted time.
 
-## Возможности
+## Features
 
-- **Автоматическое приветствие** новых участников с настраиваемым шаблоном
-- **AI-валидация** ответов через OpenAI (gpt-4o-mini)
-- **Таймер удаления** — автоматическое удаление тех, кто не представился
-- **Мульти-чат** — один бот обслуживает неограниченное количество групп
-- **Per-chat настройки** — таймаут, длина ответа, AI-валидация и др.
-- **Админский чат** — уведомления + inline-кнопки (одобрить/удалить/забанить)
-- **Whitelist** — повторный вход без онбординга
-- **Восстановление таймеров** после перезапуска бота
+- **Automatic greeting** of new members with a customizable template
+- **AI validation** of responses via OpenAI (gpt-4o-mini)
+- **Removal timer** — automatically removes members who don't introduce themselves
+- **Multi-chat** — a single bot instance serves unlimited groups
+- **Per-chat settings** — timeout, response length, AI validation, and more
+- **Admin chat** — notifications with inline buttons (approve / remove / ban)
+- **Whitelist** — returning members skip re-onboarding
+- **Timer recovery** after bot restart
 
-## Стек
+## Tech Stack
 
 - Python 3.11+, aiogram 3.x, aiosqlite, APScheduler, OpenAI API
-- SQLite (файловая БД, zero-config)
+- SQLite (file-based DB, zero-config)
 
-## Быстрый старт
+## Quick Start
 
-### 1. Настройка
+### 1. Configuration
 
 ```bash
 cp .env.example .env
-# Заполните .env: BOT_TOKEN, ADMIN_CHAT_ID, OPENAI_API_KEY
+# Fill in .env: BOT_TOKEN, ADMIN_CHAT_ID, OPENAI_API_KEY
 ```
 
-### 2. Миграции
+### 2. Migrations
 
 ```bash
 python -m migrations.run_migrations
 ```
 
-### 3. Запуск
+### 3. Run
 
 ```bash
 pip install -r requirements.txt
@@ -46,86 +46,173 @@ python -m bot.main
 docker-compose up -d
 ```
 
-## Переменные окружения
+## Environment Variables
 
-| Переменная | Описание | Обязательная |
-|-----------|----------|:----------:|
-| `BOT_TOKEN` | Токен Telegram бота | да |
-| `ADMIN_CHAT_ID` | ID чата для уведомлений администраторам | да |
-| `SQLITE_PATH` | Путь к файлу SQLite (default: data/bot.db) | нет |
-| `OPENAI_API_KEY` | Ключ OpenAI API | нет* |
-| `OPENAI_MODEL` | Модель OpenAI (default: gpt-4o-mini) | нет |
-| `DEFAULT_TIMEOUT_MINUTES` | Таймаут ответа по умолчанию (default: 15) | нет |
-| `DEFAULT_MIN_RESPONSE_LENGTH` | Мин. длина ответа (default: 10) | нет |
+| Variable | Description | Required |
+|----------|-------------|:--------:|
+| `BOT_TOKEN` | Telegram bot token (from @BotFather) | yes |
+| `ADMIN_CHAT_ID` | Chat ID for admin notifications | yes |
+| `SQLITE_PATH` | Path to SQLite file (default: `data/bot.db`) | no |
+| `OPENAI_API_KEY` | OpenAI API key | no* |
+| `OPENAI_MODEL` | OpenAI model (default: `gpt-4o-mini`) | no |
+| `DEFAULT_TIMEOUT_MINUTES` | Response timeout in minutes (default: `15`) | no |
+| `DEFAULT_MIN_RESPONSE_LENGTH` | Minimum response length (default: `10`) | no |
+| `DEFAULT_AI_VALIDATION` | Enable AI validation by default (default: `true`) | no |
+| `DEFAULT_WHITELIST_ENABLED` | Enable whitelist by default (default: `true`) | no |
+| `DEFAULT_BAN_ON_REMOVE` | Ban instead of kick on removal (default: `false`) | no |
 
-\* Без ключа AI-валидация будет отключена, все ответы автоматически одобряются.
+\* Without an API key, AI validation is disabled and all responses are automatically approved.
 
-## Админ-команды
+## How It Works
 
-Все команды работают только в админском чате (`ADMIN_CHAT_ID`).
+### Onboarding Flow
 
-| Команда | Описание |
-|---------|----------|
-| `/pending [chat_id]` | Список ожидающих участников |
-| `/approve <chat_id> <user_id>` | Одобрить участника |
-| `/remove <chat_id> <user_id>` | Удалить участника |
-| `/ban <chat_id> <user_id>` | Забанить участника |
-| `/whitelist <chat_id> <user_id>` | Добавить в whitelist |
-| `/status <chat_id> <user_id>` | Показать статус участника |
-| `/config <chat_id> [key=value ...]` | Настройки чата |
+1. **New member joins** — the bot detects the event via `chat_member` updates
+2. **Whitelist check** — if the member is whitelisted and the feature is enabled, onboarding is skipped
+3. **Welcome message** — a customizable greeting is sent, mentioning the user and the timeout
+4. **Timer starts** — APScheduler sets a deadline for the member to respond
+5. **Admin notified** — a notification is sent to `ADMIN_CHAT_ID`
 
-### Настраиваемые параметры (/config)
+### Response Handling
 
-- `timeout_minutes` — таймаут ответа (минуты)
-- `min_response_length` — минимальная длина ответа
-- `ai_validation_enabled` — AI-валидация (true/false)
-- `ban_on_remove` — банить при удалении (true/false)
-- `ban_duration_hours` — длительность бана (число или null)
-- `whitelist_enabled` — whitelist (true/false)
-- `ignore_bots` — игнорировать ботов (true/false)
-- `is_active` — активность бота в чате (true/false)
-- `welcome_text` — текст приветствия (поддерживает {timeout})
+1. **Text message received** — the bot checks whether the user has a pending onboarding
+2. **Length validation** — the response must meet the minimum length; otherwise the user is reminded
+3. **Timer cancelled** — the scheduled removal is stopped
+4. **AI validation** — if enabled, OpenAI evaluates whether the text is a meaningful introduction
+5. **Status updated** — set to `approved` or `rejected`
+6. **Admin notified** — the response is forwarded with action buttons (Approve / Remove / Ban)
 
-## Бэкапы
+### Timeout
+
+1. **Scheduler triggers** — `handle_timeout()` fires at the scheduled time
+2. **Ban or kick** — the bot removes the user via the Telegram API
+3. **Welcome message deleted** — the original greeting is cleaned up
+4. **Event logged** — the action is recorded in the `event_logs` table
+
+## Admin Commands
+
+All commands work only in the admin chat (`ADMIN_CHAT_ID`).
+
+| Command | Description |
+|---------|-------------|
+| `/pending [chat_id]` | List members awaiting a response |
+| `/approve <chat_id> <user_id>` | Manually approve a member |
+| `/remove <chat_id> <user_id>` | Remove (kick) a member |
+| `/ban <chat_id> <user_id>` | Ban a member |
+| `/whitelist <chat_id> <user_id>` | Add a member to the whitelist |
+| `/status <chat_id> <user_id>` | Show a member's onboarding status |
+| `/config <chat_id> [key=value ...]` | View or update chat settings |
+
+### User Commands
+
+| Command | Description |
+|---------|-------------|
+| `/chatid` | Display the current group's Telegram chat ID |
+
+### Configurable Parameters (`/config`)
+
+| Key | Description | Type |
+|-----|-------------|------|
+| `timeout_minutes` | Response timeout (minutes) | integer |
+| `min_response_length` | Minimum response length | integer |
+| `ai_validation_enabled` | AI validation | `true` / `false` |
+| `ban_on_remove` | Ban on removal instead of kick | `true` / `false` |
+| `ban_duration_hours` | Ban duration (number or `null` for permanent) | integer / null |
+| `whitelist_enabled` | Whitelist feature | `true` / `false` |
+| `ignore_bots` | Ignore bot accounts | `true` / `false` |
+| `is_active` | Bot active in this chat | `true` / `false` |
+| `welcome_text` | Welcome message template (supports `{timeout}`) | string |
+
+## Database
+
+The bot uses SQLite with three tables:
+
+- **`chat_settings`** — per-group configuration (timeout, welcome text, feature flags)
+- **`group_members`** — individual onboarding state (status, response, AI result, timestamps)
+- **`event_logs`** — audit trail of all bot actions
+
+### Member Statuses
+
+| Status | Meaning |
+|--------|---------|
+| `joined` | User entered the group |
+| `prompt_sent` | Welcome message sent |
+| `approved` | Passed validation (auto or manual) |
+| `rejected` | Failed AI validation |
+| `removed_timeout` | Removed for not responding in time |
+| `removed_rejected` | Removed after failed validation |
+| `removed_manual` | Removed by admin |
+| `left` | User left voluntarily |
+| `error` | Processing error occurred |
+
+## Backups
 
 ```bash
-# Бэкап
+# Create a backup
 ./scripts/backup.sh
 
-# Восстановление
+# Restore from backup
 ./scripts/restore.sh backups/backup_20260101_120000.db [target_path]
 ```
 
-## Тесты
+Set up automatic daily backups via cron:
+
+```bash
+# Run at 3:00 AM daily, keep last 30 backups
+0 3 * * * SQLITE_PATH=/path/to/bot.db BACKUP_DIR=/path/to/backups /path/to/scripts/backup.sh
+```
+
+## Tests
 
 ```bash
 pip install pytest pytest-asyncio
 pytest tests/
 ```
 
-## Структура проекта
+## Project Structure
 
 ```
 bot/
-├── main.py              # Точка входа
-├── config.py            # Конфигурация (.env)
-├── db/                  # Слой работы с БД
-│   ├── connection.py    # Соединение aiosqlite
-│   ├── members.py       # CRUD group_members
-│   ├── settings.py      # CRUD chat_settings
-│   └── events.py        # Логирование событий
-├── handlers/            # Обработчики Telegram-событий
-│   ├── new_member.py    # Вход нового участника
-│   ├── message.py       # Ответы на онбординг
-│   ├── member_left.py   # Выход участника
-│   └── admin.py         # Админ-команды + inline-кнопки
-├── services/            # Бизнес-логика
-│   ├── onboarding.py    # Основной сценарий
-│   ├── scheduler.py     # Таймеры (APScheduler)
-│   ├── ai_validator.py  # Валидация через OpenAI
-│   └── notifier.py      # Уведомления в админский чат
+├── main.py              # Entry point, dispatcher setup
+├── config.py            # Configuration (.env loading)
+├── db/                  # Database layer
+│   ├── connection.py    # aiosqlite connection management
+│   ├── members.py       # CRUD for group_members
+│   ├── settings.py      # CRUD for chat_settings
+│   └── events.py        # Event logging
+├── handlers/            # Telegram event handlers
+│   ├── new_member.py    # New member joining
+│   ├── message.py       # Onboarding responses + /chatid
+│   ├── member_left.py   # Member leaving
+│   └── admin.py         # Admin commands + inline buttons
+├── services/            # Business logic
+│   ├── onboarding.py    # Core onboarding workflow
+│   ├── scheduler.py     # Timers (APScheduler)
+│   ├── ai_validator.py  # OpenAI validation
+│   └── notifier.py      # Admin chat notifications
 ├── middlewares/
 │   └── rate_limit.py    # Rate limiting
 └── utils/
-    └── template.py      # Подстановка переменных в шаблоны
+    └── template.py      # Template variable substitution
+
+migrations/
+├── 001_initial.sql      # Database schema
+└── run_migrations.py    # Migration runner
+
+scripts/
+├── backup.sh            # SQLite backup (keeps last 30)
+└── restore.sh           # Database restore
+
+tests/
+├── test_onboarding.py   # Onboarding logic tests
+├── test_ai_validator.py # AI validation tests
+└── test_template.py     # Template rendering tests
 ```
+
+## Deployment
+
+See [DEPLOY.md](DEPLOY.md) for detailed deployment instructions using systemd or Docker.
+
+## License
+
+This project is provided as-is for private use.
