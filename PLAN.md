@@ -26,8 +26,8 @@
 |-----------|-----------|-------------|
 | Язык | Python 3.11+ | По требованию |
 | Бот-фреймворк | aiogram 3.x | Асинхронный, зрелый, middleware, роутеры |
-| БД | Supabase (PostgreSQL) | По требованию |
-| DB-клиент | asyncpg + supabase-py | asyncpg для основных операций, supabase-py для REST API |
+| БД | SQLite | Файловая, zero-config, лёгкая для деплоя |
+| DB-клиент | aiosqlite | Асинхронная обёртка над sqlite3 |
 | Таймеры | APScheduler | Персистентные джобы, легче Celery |
 | AI | OpenAI API (gpt-4o-mini) | Дешёвый и быстрый для валидации текста |
 | Конфиг | python-dotenv + БД | Глобальное в .env, per-chat в таблице |

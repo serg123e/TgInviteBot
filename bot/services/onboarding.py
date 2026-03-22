@@ -214,7 +214,8 @@ async def restore_timers(bot: Bot) -> int:
 
     for member in pending:
         cfg = await settings.get_or_create(member.chat_id)
-        elapsed = (now - member.joined_at).total_seconds() / 60
+        joined = datetime.fromisoformat(member.joined_at).replace(tzinfo=timezone.utc)
+        elapsed = (now - joined).total_seconds() / 60
         remaining = cfg.timeout_minutes - elapsed
 
         if remaining <= 0:

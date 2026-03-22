@@ -1,11 +1,11 @@
 #!/bin/bash
-# Database restore script
-# Usage: ./scripts/restore.sh <backup_file> [target_database_url]
+# Database restore script (SQLite)
+# Usage: ./scripts/restore.sh <backup_file> [target_path]
 
 set -euo pipefail
 
-BACKUP_FILE="${1:?Usage: restore.sh <backup_file> [target_database_url]}"
-TARGET_URL="${2:-${DATABASE_URL:?DATABASE_URL is required}}"
+BACKUP_FILE="${1:?Usage: restore.sh <backup_file> [target_path]}"
+TARGET="${2:-${SQLITE_PATH:-data/bot.db}}"
 
 if [ ! -f "$BACKUP_FILE" ]; then
     echo "ERROR: File not found: $BACKUP_FILE"
@@ -13,7 +13,7 @@ if [ ! -f "$BACKUP_FILE" ]; then
 fi
 
 echo "Restoring from: $BACKUP_FILE"
-echo "Target: $TARGET_URL"
+echo "Target: $TARGET"
 read -p "Continue? (y/N) " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -21,10 +21,5 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
-if [[ "$BACKUP_FILE" == *.gz ]]; then
-    gunzip -c "$BACKUP_FILE" | psql "$TARGET_URL"
-else
-    psql "$TARGET_URL" < "$BACKUP_FILE"
-fi
-
+cp "$BACKUP_FILE" "$TARGET"
 echo "Restore complete."

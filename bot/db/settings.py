@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from bot.db.connection import get_pool
+from bot.db.connection import get_db
 
 log = logging.getLogger(__name__)
 
@@ -26,46 +26,59 @@ class ChatSettings:
 
 
 async def get_or_create(chat_id: int, chat_title: str | None = None) -> ChatSettings:
-    pool = get_pool()
-    row = await pool.fetchrow(
-        "SELECT * FROM chat_settings WHERE chat_id = $1", chat_id
-    )
+    db = get_db()
+    async with db.execute(
+        "SELECT * FROM chat_settings WHERE chat_id = ?", (chat_id,)
+    ) as cur:
+        row = await cur.fetchone()
+
     if row:
         return _row_to_settings(row)
 
-    row = await pool.fetchrow(
+    await db.execute(
         """
         INSERT INTO chat_settings (chat_id, chat_title)
-        VALUES ($1, $2)
-        ON CONFLICT (chat_id) DO UPDATE SET chat_title = EXCLUDED.chat_title
-        RETURNING *
+        VALUES (?, ?)
+        ON CONFLICT (chat_id) DO UPDATE SET chat_title = excluded.chat_title
         """,
-        chat_id,
-        chat_title,
+        (chat_id, chat_title),
     )
+    await db.commit()
+
+    async with db.execute(
+        "SELECT * FROM chat_settings WHERE chat_id = ?", (chat_id,)
+    ) as cur:
+        row = await cur.fetchone()
+
     log.info("Created chat_settings for chat_id=%d", chat_id)
     return _row_to_settings(row)
 
 
 async def update(chat_id: int, **kwargs) -> ChatSettings | None:
-    pool = get_pool()
+    db = get_db()
     if not kwargs:
         return await get_or_create(chat_id)
 
     set_parts = []
     values = []
-    for i, (key, value) in enumerate(kwargs.items(), start=1):
-        set_parts.append(f"{key} = ${i}")
+    for key, value in kwargs.items():
+        set_parts.append(f"{key} = ?")
         values.append(value)
     values.append(chat_id)
 
     query = f"""
         UPDATE chat_settings
-        SET {', '.join(set_parts)}, updated_at = NOW()
-        WHERE chat_id = ${len(values)}
-        RETURNING *
+        SET {', '.join(set_parts)}, updated_at = datetime('now')
+        WHERE chat_id = ?
     """
-    row = await pool.fetchrow(query, *values)
+    await db.execute(query, values)
+    await db.commit()
+
+    async with db.execute(
+        "SELECT * FROM chat_settings WHERE chat_id = ?", (chat_id,)
+    ) as cur:
+        row = await cur.fetchone()
+
     if row is None:
         return None
     return _row_to_settings(row)
@@ -78,10 +91,10 @@ def _row_to_settings(row) -> ChatSettings:
         welcome_text=row["welcome_text"],
         timeout_minutes=row["timeout_minutes"],
         min_response_length=row["min_response_length"],
-        ai_validation_enabled=row["ai_validation_enabled"],
-        ban_on_remove=row["ban_on_remove"],
+        ai_validation_enabled=bool(row["ai_validation_enabled"]),
+        ban_on_remove=bool(row["ban_on_remove"]),
         ban_duration_hours=row["ban_duration_hours"],
-        whitelist_enabled=row["whitelist_enabled"],
-        ignore_bots=row["ignore_bots"],
-        is_active=row["is_active"],
+        whitelist_enabled=bool(row["whitelist_enabled"]),
+        ignore_bots=bool(row["ignore_bots"]),
+        is_active=bool(row["is_active"]),
     )

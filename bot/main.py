@@ -10,7 +10,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from bot.config import config
-from bot.db.connection import close_pool, init_pool
+from bot.db.connection import close_db, init_db
 from bot.handlers import admin, member_left, message, new_member
 from bot.middlewares.rate_limit import RateLimitMiddleware
 from bot.services.scheduler import get_scheduler
@@ -25,8 +25,12 @@ log = logging.getLogger(__name__)
 
 
 async def on_startup(bot: Bot) -> None:
-    await init_pool(config.database_url)
-    log.info("Database connected")
+    db = await init_db(config.sqlite_path)
+
+    # Run migrations on startup
+    from migrations.run_migrations import run
+    run()
+    log.info("Database ready: %s", config.sqlite_path)
 
     scheduler = get_scheduler()
     scheduler.start()
@@ -45,7 +49,7 @@ async def on_shutdown(bot: Bot) -> None:
     scheduler.shutdown(wait=False)
     log.info("Scheduler stopped")
 
-    await close_pool()
+    await close_db()
     log.info("Database disconnected")
 
 
@@ -55,9 +59,6 @@ async def main() -> None:
         sys.exit(1)
     if not config.admin_chat_id:
         log.error("ADMIN_CHAT_ID is required")
-        sys.exit(1)
-    if not config.database_url:
-        log.error("DATABASE_URL is required")
         sys.exit(1)
 
     bot = Bot(

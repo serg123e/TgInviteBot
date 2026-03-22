@@ -7,3 +7,9 @@ build/
 .venv/
 venv/
 .pytest_cache/
+data/
+backups/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

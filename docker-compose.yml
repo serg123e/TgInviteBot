@@ -5,11 +5,8 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
-    depends_on:
-      - migrate
+    volumes:
+      - bot-data:/app/data
 
-  migrate:
-    build: .
-    command: python -m migrations.run_migrations
-    env_file: .env
-    restart: "no"
+volumes:
+  bot-data:

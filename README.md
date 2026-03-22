@@ -15,8 +15,8 @@
 
 ## Стек
 
-- Python 3.11+, aiogram 3.x, asyncpg, APScheduler, OpenAI API
-- PostgreSQL (Supabase)
+- Python 3.11+, aiogram 3.x, aiosqlite, APScheduler, OpenAI API
+- SQLite (файловая БД, zero-config)
 
 ## Быстрый старт
 
@@ -24,7 +24,7 @@
 
 ```bash
 cp .env.example .env
-# Заполните .env: BOT_TOKEN, ADMIN_CHAT_ID, DATABASE_URL, OPENAI_API_KEY
+# Заполните .env: BOT_TOKEN, ADMIN_CHAT_ID, OPENAI_API_KEY
 ```
 
 ### 2. Миграции
@@ -52,7 +52,7 @@ docker-compose up -d
 |-----------|----------|:----------:|
 | `BOT_TOKEN` | Токен Telegram бота | да |
 | `ADMIN_CHAT_ID` | ID чата для уведомлений администраторам | да |
-| `DATABASE_URL` | PostgreSQL connection string | да |
+| `SQLITE_PATH` | Путь к файлу SQLite (default: data/bot.db) | нет |
 | `OPENAI_API_KEY` | Ключ OpenAI API | нет* |
 | `OPENAI_MODEL` | Модель OpenAI (default: gpt-4o-mini) | нет |
 | `DEFAULT_TIMEOUT_MINUTES` | Таймаут ответа по умолчанию (default: 15) | нет |
@@ -93,7 +93,7 @@ docker-compose up -d
 ./scripts/backup.sh
 
 # Восстановление
-./scripts/restore.sh backups/backup_20260101_120000.sql.gz [target_db_url]
+./scripts/restore.sh backups/backup_20260101_120000.db [target_path]
 ```
 
 ## Тесты
@@ -110,7 +110,7 @@ bot/
 ├── main.py              # Точка входа
 ├── config.py            # Конфигурация (.env)
 ├── db/                  # Слой работы с БД
-│   ├── connection.py    # Пул соединений asyncpg
+│   ├── connection.py    # Соединение aiosqlite
 │   ├── members.py       # CRUD group_members
 │   ├── settings.py      # CRUD chat_settings
 │   └── events.py        # Логирование событий

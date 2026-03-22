@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 
-from bot.db.connection import get_pool
+from bot.db.connection import get_db
 
 log = logging.getLogger(__name__)
 
@@ -18,14 +18,14 @@ class GroupMember:
     username: str | None
     first_name: str | None
     last_name: str | None
-    joined_at: datetime
-    prompt_sent_at: datetime | None
+    joined_at: str
+    prompt_sent_at: str | None
     prompt_message_id: int | None
     response_text: str | None
-    responded_at: datetime | None
+    responded_at: str | None
     ai_validation_result: dict | None
     status: str
-    removed_at: datetime | None
+    removed_at: str | None
     removal_reason: str | None
     is_whitelisted: bool
 
@@ -37,16 +37,16 @@ async def upsert_member(
     first_name: str | None = None,
     last_name: str | None = None,
 ) -> GroupMember:
-    pool = get_pool()
-    row = await pool.fetchrow(
+    db = get_db()
+    await db.execute(
         """
         INSERT INTO group_members (chat_id, telegram_user_id, username, first_name, last_name, status)
-        VALUES ($1, $2, $3, $4, $5, 'joined')
+        VALUES (?, ?, ?, ?, ?, 'joined')
         ON CONFLICT (chat_id, telegram_user_id) DO UPDATE SET
-            username = EXCLUDED.username,
-            first_name = EXCLUDED.first_name,
-            last_name = EXCLUDED.last_name,
-            joined_at = NOW(),
+            username = excluded.username,
+            first_name = excluded.first_name,
+            last_name = excluded.last_name,
+            joined_at = datetime('now'),
             status = 'joined',
             response_text = NULL,
             responded_at = NULL,
@@ -55,82 +55,109 @@ async def upsert_member(
             removal_reason = NULL,
             prompt_sent_at = NULL,
             prompt_message_id = NULL,
-            updated_at = NOW()
-        RETURNING *
+            updated_at = datetime('now')
         """,
-        chat_id, user_id, username, first_name, last_name,
+        (chat_id, user_id, username, first_name, last_name),
     )
+    await db.commit()
+
+    async with db.execute(
+        "SELECT * FROM group_members WHERE chat_id = ? AND telegram_user_id = ?",
+        (chat_id, user_id),
+    ) as cur:
+        row = await cur.fetchone()
+
     return _row_to_member(row)
 
 
 async def get_member(chat_id: int, user_id: int) -> GroupMember | None:
-    pool = get_pool()
-    row = await pool.fetchrow(
-        "SELECT * FROM group_members WHERE chat_id = $1 AND telegram_user_id = $2",
-        chat_id, user_id,
-    )
+    db = get_db()
+    async with db.execute(
+        "SELECT * FROM group_members WHERE chat_id = ? AND telegram_user_id = ?",
+        (chat_id, user_id),
+    ) as cur:
+        row = await cur.fetchone()
     return _row_to_member(row) if row else None
 
 
 async def update_status(
     chat_id: int, user_id: int, status: str, **kwargs
 ) -> GroupMember | None:
-    pool = get_pool()
-    set_parts = ["status = $3", "updated_at = NOW()"]
-    values = [chat_id, user_id, status]
+    db = get_db()
+    set_parts = ["status = ?", "updated_at = datetime('now')"]
+    values: list = [status]
 
     for key, value in kwargs.items():
-        idx = len(values) + 1
+        set_parts.append(f"{key} = ?")
         if key == "ai_validation_result" and isinstance(value, dict):
-            set_parts.append(f"{key} = ${idx}::jsonb")
             values.append(json.dumps(value))
+        elif isinstance(value, datetime):
+            values.append(value.isoformat())
         else:
-            set_parts.append(f"{key} = ${idx}")
             values.append(value)
+
+    values.extend([chat_id, user_id])
 
     query = f"""
         UPDATE group_members
         SET {', '.join(set_parts)}
-        WHERE chat_id = $1 AND telegram_user_id = $2
-        RETURNING *
+        WHERE chat_id = ? AND telegram_user_id = ?
     """
-    row = await pool.fetchrow(query, *values)
+    await db.execute(query, values)
+    await db.commit()
+
+    async with db.execute(
+        "SELECT * FROM group_members WHERE chat_id = ? AND telegram_user_id = ?",
+        (chat_id, user_id),
+    ) as cur:
+        row = await cur.fetchone()
+
     return _row_to_member(row) if row else None
 
 
 async def get_pending_members(chat_id: int | None = None) -> list[GroupMember]:
-    pool = get_pool()
+    db = get_db()
     if chat_id:
-        rows = await pool.fetch(
-            "SELECT * FROM group_members WHERE chat_id = $1 AND status IN ('joined', 'prompt_sent') ORDER BY joined_at",
-            chat_id,
-        )
+        async with db.execute(
+            "SELECT * FROM group_members WHERE chat_id = ? AND status IN ('joined', 'prompt_sent') ORDER BY joined_at",
+            (chat_id,),
+        ) as cur:
+            rows = await cur.fetchall()
     else:
-        rows = await pool.fetch(
+        async with db.execute(
             "SELECT * FROM group_members WHERE status IN ('joined', 'prompt_sent') ORDER BY joined_at"
-        )
+        ) as cur:
+            rows = await cur.fetchall()
     return [_row_to_member(r) for r in rows]
 
 
 async def get_members_by_status(chat_id: int, status: str) -> list[GroupMember]:
-    pool = get_pool()
-    rows = await pool.fetch(
-        "SELECT * FROM group_members WHERE chat_id = $1 AND status = $2 ORDER BY joined_at",
-        chat_id, status,
-    )
+    db = get_db()
+    async with db.execute(
+        "SELECT * FROM group_members WHERE chat_id = ? AND status = ? ORDER BY joined_at",
+        (chat_id, status),
+    ) as cur:
+        rows = await cur.fetchall()
     return [_row_to_member(r) for r in rows]
 
 
 async def set_whitelisted(chat_id: int, user_id: int, whitelisted: bool = True) -> GroupMember | None:
-    pool = get_pool()
-    row = await pool.fetchrow(
+    db = get_db()
+    await db.execute(
         """
-        UPDATE group_members SET is_whitelisted = $3, updated_at = NOW()
-        WHERE chat_id = $1 AND telegram_user_id = $2
-        RETURNING *
+        UPDATE group_members SET is_whitelisted = ?, updated_at = datetime('now')
+        WHERE chat_id = ? AND telegram_user_id = ?
         """,
-        chat_id, user_id, whitelisted,
+        (int(whitelisted), chat_id, user_id),
     )
+    await db.commit()
+
+    async with db.execute(
+        "SELECT * FROM group_members WHERE chat_id = ? AND telegram_user_id = ?",
+        (chat_id, user_id),
+    ) as cur:
+        row = await cur.fetchone()
+
     return _row_to_member(row) if row else None
 
 
@@ -154,5 +181,5 @@ def _row_to_member(row) -> GroupMember:
         status=row["status"],
         removed_at=row["removed_at"],
         removal_reason=row["removal_reason"],
-        is_whitelisted=row["is_whitelisted"],
+        is_whitelisted=bool(row["is_whitelisted"]),
     )
