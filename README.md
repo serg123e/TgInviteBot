@@ -213,6 +213,34 @@ tests/
 
 See [DEPLOY.md](DEPLOY.md) for detailed deployment instructions using systemd or Docker.
 
+## How It Compares
+
+Most Telegram verification bots use CAPTCHA (math puzzles, button clicks, image selection). This bot takes a fundamentally different approach — **meaningful text-based onboarding with AI validation**.
+
+| Feature | This Bot | CAPTCHA Bots | Welcome Bots | SaaS Platforms |
+|---------|:--------:|:------------:|:------------:|:--------------:|
+| Text-based introduction | Yes | — | — | — |
+| AI response validation (LLM) | Yes | — | — | — |
+| Auto-removal on timeout | Yes | Yes | — | Partial |
+| Whitelist (skip re-onboarding) | Yes | — | — | — |
+| Admin inline action buttons | Yes | Partial | Yes | Yes |
+| Self-hosted / open-source | Yes | Partial | — | — |
+| Per-chat configuration | Yes | Partial | Yes | Yes |
+| Timer recovery after restart | Yes | — | N/A | N/A |
+| Zero-dependency DB (SQLite) | Yes | Partial | — | — |
+
+### vs CAPTCHA Bots (AntiSpamGlobalBot, Shieldy, JoinCaptchaBot, etc.)
+
+CAPTCHA bots answer "are you human?" — this bot answers "who are you and why are you here?" New members write a real introduction (name, occupation, reason for joining), which is then evaluated by an LLM. This creates a completely different community atmosphere compared to solving a math puzzle.
+
+### vs Welcome Bots (Group Butler, Miss Rose, CodeX Bot)
+
+Welcome bots greet new members but don't require or validate a response. This bot implements the **full cycle**: greeting → waiting for response → AI validation → decision (approve/reject) → auto-removal on timeout.
+
+### vs SaaS Platforms (Metricgram, etc.)
+
+SaaS platforms offer analytics, payments, and gamification but lack AI-powered onboarding validation. This bot is **self-hosted** and **free**, with full control over your data (SQLite, no external services except OpenAI).
+
 ## License
 
 This project is provided as-is for private use.
