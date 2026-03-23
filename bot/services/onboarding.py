@@ -47,11 +47,12 @@ async def handle_new_member(
     await members.upsert_member(chat_id, user_id, username, first_name, last_name)
 
     # Send welcome message
-    welcome = render(cfg.welcome_text, timeout=cfg.timeout_minutes)
-    if username:
-        welcome = f"@{escape(username)}, {welcome}"
-    elif first_name:
-        welcome = f"{escape(first_name)}, {welcome}"
+    display = escape(username) if username else (escape(first_name) if first_name else str(user_id))
+    mention = f"@{display}" if username else display
+    if "{user}" in cfg.welcome_text:
+        welcome = render(cfg.welcome_text, timeout=cfg.timeout_minutes, user=mention)
+    else:
+        welcome = f"{mention}, {render(cfg.welcome_text, timeout=cfg.timeout_minutes)}"
 
     msg = await bot.send_message(chat_id, welcome)
 

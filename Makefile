@@ -1,14 +1,17 @@
 PYTHON := python
 SRC := bot migrations tests
 
-.PHONY: help lint lint-ruff lint-mypy fmt fmt-check test deploy logs status restart
+.PHONY: help lint lint-ruff lint-mypy lint-pyright audit semgrep fmt fmt-check test deploy logs status restart
 
 help:
 	@echo "Usage: make <target>"
 	@echo ""
-	@echo "  lint        Run all linters (ruff + mypy)"
+	@echo "  lint        Run all linters (ruff + mypy + pyright)"
 	@echo "  lint-ruff   Run ruff linter"
 	@echo "  lint-mypy   Run mypy type checker"
+	@echo "  lint-pyright Run pyright type checker"
+	@echo "  audit       Run pip-audit for dependency vulnerabilities"
+	@echo "  semgrep     Run semgrep static analysis"
 	@echo "  fmt         Auto-format code with ruff"
 	@echo "  fmt-check   Check formatting without writing"
 	@echo "  test        Run test suite"
@@ -19,13 +22,24 @@ help:
 
 # --- Linting ---
 
-lint: lint-ruff lint-mypy
+lint: lint-ruff lint-mypy lint-pyright
 
 lint-ruff:
 	$(PYTHON) -m ruff check $(SRC)
 
 lint-mypy:
 	$(PYTHON) -m mypy $(SRC) --ignore-missing-imports --explicit-package-bases
+
+lint-pyright:
+	$(PYTHON) -m pyright $(SRC)
+
+# --- Security ---
+
+audit:
+	$(PYTHON) -m pip_audit .
+
+semgrep:
+	semgrep scan --config auto $(SRC)
 
 # --- Formatting ---
 

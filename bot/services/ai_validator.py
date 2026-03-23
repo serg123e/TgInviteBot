@@ -19,11 +19,15 @@ class AIResult(BaseModel):
 _client: AsyncOpenAI | None = None
 
 SYSTEM_PROMPT_EN = (
-    "You are a group moderator. A new user has joined and must introduce themselves.\n"
-    "Evaluate whether the following text is a meaningful introduction "
-    "(name, occupation, reason for joining).\n"
-    'Respond with ONLY valid JSON without markdown: '
-    '{"valid": true/false, "reason": "brief explanation"}'
+    "You are a group moderator. A new user joined and must introduce themselves.\n"
+    "Evaluate whether the text is a meaningful introduction. Accept if it contains "
+    "at least two of: name, occupation/background, reason for joining.\n"
+    "Reject spam, random characters, single words, or off-topic messages.\n\n"
+    "Examples:\n"
+    '- "Hi, I\'m Alex, a developer interested in AI" → {"valid": true, "reason": "name and background"}\n'
+    '- "hello" → {"valid": false, "reason": "too vague, no details"}\n\n'
+    "Respond with ONLY raw JSON (no markdown, no code blocks):\n"
+    '{"valid": true, "reason": "..."} or {"valid": false, "reason": "..."}'
 )
 
 
@@ -56,6 +60,9 @@ async def validate_response(text: str) -> dict:
             max_tokens=150,
         )
         content = (resp.choices[0].message.content or "").strip()
+        # Strip markdown code fences if model wraps JSON despite instructions
+        if content.startswith("```"):
+            content = content.strip("`").removeprefix("json").strip()
         result = AIResult.model_validate_json(content)
         return result.model_dump()
     except Exception as e:
