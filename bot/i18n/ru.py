@@ -3,7 +3,7 @@
 MESSAGES: dict[str, str] = {
     # --- Onboarding (group-facing) ---
     "{user}, message too short. Minimum {min_len} characters.":
-        "@{user}, сообщение слишком короткое. Минимум {min_len} символов.",
+        "{user}, сообщение слишком короткое. Минимум {min_len} символов.",
     "Thanks for the introduction! Welcome to the group.":
         "Спасибо за представление! Добро пожаловать в группу.",
     "{user}, please introduce yourself with text.":

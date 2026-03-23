@@ -54,13 +54,22 @@ async def handle_new_member(
     else:
         welcome = f"{mention}, {render(cfg.welcome_text, timeout=cfg.timeout_minutes)}"
 
-    msg = await bot.send_message(chat_id, welcome)
+    try:
+        msg = await bot.send_message(chat_id, welcome)
+        log.info("Sent welcome to user %d in chat %d (msg_id=%d)", user_id, chat_id, msg.message_id)
+    except Exception as e:
+        log.error("Failed to send welcome to chat %d: %s", chat_id, e)
+        return
 
     # Schedule removal
     schedule_removal(chat_id, user_id, cfg.timeout_minutes, bot)
 
     # Notify admin
-    admin_msg_id = await notifier.notify_new_member(bot, chat_id, chat_title, user_id, username, first_name)
+    try:
+        admin_msg_id = await notifier.notify_new_member(bot, chat_id, chat_title, user_id, username, first_name)
+    except Exception as e:
+        log.error("Failed to notify admin: %s", e)
+        admin_msg_id = None
 
     # Update member with prompt info and admin message in a single call
     await members.update_status(
