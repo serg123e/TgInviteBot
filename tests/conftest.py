@@ -14,8 +14,6 @@ async def db():
 
     with open("migrations/001_initial.sql") as f:
         await conn.executescript(f.read())
-    with open("migrations/002_admin_message_id.sql") as f:
-        await conn.executescript(f.read())
 
     original = _conn._db
     _conn._db = conn
