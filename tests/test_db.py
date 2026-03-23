@@ -2,7 +2,7 @@
 
 import pytest
 
-from bot.db import connection, events, members, settings
+from bot.db import connection, members, settings
 
 # --- connection ---
 
@@ -184,25 +184,3 @@ async def test_update_nonexistent_chat(db):
     assert result is None
 
 
-# --- events ---
-
-
-@pytest.mark.asyncio
-async def test_log_event(db):
-    await events.log_event("test_event", 100, 1, {"key": "val"})
-
-    async with db.execute("SELECT * FROM event_logs") as cur:
-        rows = await cur.fetchall()
-    assert len(rows) == 1
-    assert rows[0]["event_type"] == "test_event"
-    assert rows[0]["chat_id"] == 100
-
-
-@pytest.mark.asyncio
-async def test_log_event_no_details(db):
-    await events.log_event("simple", 100, 1)
-
-    async with db.execute("SELECT * FROM event_logs") as cur:
-        rows = await cur.fetchall()
-    assert len(rows) == 1
-    assert rows[0]["details"] is None

@@ -17,7 +17,6 @@ CHAT_ID = -100999
 def _make_cfg(**overrides):
     cfg = MagicMock()
     cfg.ban_on_remove = False
-    cfg.ban_duration_hours = None
     cfg.chat_title = "Test Group"
     cfg.timeout_minutes = 15
     for k, v in overrides.items():
@@ -53,8 +52,7 @@ async def test_handle_timeout_kick():
     with patch("bot.services.onboarding.members.get_member", return_value=member), \
          patch("bot.services.onboarding.settings.get_or_create", return_value=cfg), \
          patch("bot.services.onboarding.members.update_status", new_callable=AsyncMock) as upd, \
-         patch("bot.services.onboarding.notifier.notify_timeout", new_callable=AsyncMock), \
-         patch("bot.services.onboarding.events.log_event", new_callable=AsyncMock):
+         patch("bot.services.onboarding.notifier.notify_timeout", new_callable=AsyncMock):
 
         await handle_timeout(bot, CHAT_ID, 1)
 
@@ -75,8 +73,7 @@ async def test_handle_timeout_ban():
     with patch("bot.services.onboarding.members.get_member", return_value=member), \
          patch("bot.services.onboarding.settings.get_or_create", return_value=cfg), \
          patch("bot.services.onboarding.members.update_status", new_callable=AsyncMock), \
-         patch("bot.services.onboarding.notifier.notify_timeout", new_callable=AsyncMock), \
-         patch("bot.services.onboarding.events.log_event", new_callable=AsyncMock):
+         patch("bot.services.onboarding.notifier.notify_timeout", new_callable=AsyncMock):
 
         await handle_timeout(bot, CHAT_ID, 1)
 
@@ -133,8 +130,7 @@ async def test_handle_timeout_deletes_prompt_message():
     with patch("bot.services.onboarding.members.get_member", return_value=member), \
          patch("bot.services.onboarding.settings.get_or_create", return_value=cfg), \
          patch("bot.services.onboarding.members.update_status", new_callable=AsyncMock), \
-         patch("bot.services.onboarding.notifier.notify_timeout", new_callable=AsyncMock), \
-         patch("bot.services.onboarding.events.log_event", new_callable=AsyncMock):
+         patch("bot.services.onboarding.notifier.notify_timeout", new_callable=AsyncMock):
 
         await handle_timeout(bot, CHAT_ID, 1)
 
@@ -152,8 +148,7 @@ async def test_handle_timeout_delete_message_failure_ignored():
     with patch("bot.services.onboarding.members.get_member", return_value=member), \
          patch("bot.services.onboarding.settings.get_or_create", return_value=cfg), \
          patch("bot.services.onboarding.members.update_status", new_callable=AsyncMock), \
-         patch("bot.services.onboarding.notifier.notify_timeout", new_callable=AsyncMock) as nt, \
-         patch("bot.services.onboarding.events.log_event", new_callable=AsyncMock):
+         patch("bot.services.onboarding.notifier.notify_timeout", new_callable=AsyncMock) as nt:
 
         await handle_timeout(bot, CHAT_ID, 1)
 
@@ -171,8 +166,7 @@ async def test_handle_timeout_passes_admin_message_id():
     with patch("bot.services.onboarding.members.get_member", return_value=member), \
          patch("bot.services.onboarding.settings.get_or_create", return_value=cfg), \
          patch("bot.services.onboarding.members.update_status", new_callable=AsyncMock), \
-         patch("bot.services.onboarding.notifier.notify_timeout", new_callable=AsyncMock) as nt, \
-         patch("bot.services.onboarding.events.log_event", new_callable=AsyncMock):
+         patch("bot.services.onboarding.notifier.notify_timeout", new_callable=AsyncMock) as nt:
 
         await handle_timeout(bot, CHAT_ID, 1)
 
@@ -190,12 +184,13 @@ async def test_approve_member_success():
     with patch("bot.services.onboarding.members.get_member", return_value=member), \
          patch("bot.services.onboarding.cancel_removal") as cancel, \
          patch("bot.services.onboarding.members.update_status", new_callable=AsyncMock), \
-         patch("bot.services.onboarding.events.log_event", new_callable=AsyncMock):
+         patch("bot.services.onboarding.members.set_whitelisted", new_callable=AsyncMock) as wl:
 
         result = await approve_member(bot, CHAT_ID, 1)
 
     assert result is True
     cancel.assert_called_once_with(CHAT_ID, 1)
+    wl.assert_called_once_with(CHAT_ID, 1, True)
 
 
 @pytest.mark.asyncio
@@ -218,8 +213,7 @@ async def test_remove_member_kick():
 
     with patch("bot.services.onboarding.members.get_member", return_value=member), \
          patch("bot.services.onboarding.cancel_removal"), \
-         patch("bot.services.onboarding.members.update_status", new_callable=AsyncMock), \
-         patch("bot.services.onboarding.events.log_event", new_callable=AsyncMock):
+         patch("bot.services.onboarding.members.update_status", new_callable=AsyncMock):
 
         result = await remove_member(bot, CHAT_ID, 1, ban=False)
 
@@ -235,8 +229,7 @@ async def test_remove_member_ban():
 
     with patch("bot.services.onboarding.members.get_member", return_value=member), \
          patch("bot.services.onboarding.cancel_removal"), \
-         patch("bot.services.onboarding.members.update_status", new_callable=AsyncMock), \
-         patch("bot.services.onboarding.events.log_event", new_callable=AsyncMock):
+         patch("bot.services.onboarding.members.update_status", new_callable=AsyncMock):
 
         result = await remove_member(bot, CHAT_ID, 1, ban=True)
 

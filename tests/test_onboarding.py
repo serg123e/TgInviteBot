@@ -46,8 +46,8 @@ async def test_handle_response_ai_disabled_auto_approves():
          patch("bot.services.onboarding.members.get_member", return_value=mock_member), \
          patch("bot.services.onboarding.cancel_removal"), \
          patch("bot.services.onboarding.members.update_status", new_callable=AsyncMock) as upd, \
-         patch("bot.services.onboarding.notifier.notify_response", new_callable=AsyncMock), \
-         patch("bot.services.onboarding.events.log_event", new_callable=AsyncMock):
+         patch("bot.services.onboarding.members.set_whitelisted", new_callable=AsyncMock), \
+         patch("bot.services.onboarding.notifier.notify_response", new_callable=AsyncMock):
 
         await handle_response(
             bot=bot, chat_id=-100123, chat_title="Test",
@@ -66,7 +66,6 @@ async def test_handle_new_member_whitelisted():
     mock_cfg = MagicMock()
     mock_cfg.is_active = True
     mock_cfg.ignore_bots = False
-    mock_cfg.whitelist_enabled = True
 
     mock_member = MagicMock()
     mock_member.is_whitelisted = True
@@ -74,8 +73,7 @@ async def test_handle_new_member_whitelisted():
     bot = AsyncMock()
 
     with patch("bot.services.onboarding.settings.get_or_create", return_value=mock_cfg), \
-         patch("bot.services.onboarding.members.get_member", return_value=mock_member), \
-         patch("bot.services.onboarding.events.log_event", new_callable=AsyncMock):
+         patch("bot.services.onboarding.members.get_member", return_value=mock_member):
         await handle_new_member(
             bot=bot,
             chat_id=-100123,

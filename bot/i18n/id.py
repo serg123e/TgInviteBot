@@ -34,27 +34,11 @@ MESSAGES: dict[str, str] = {
     # --- Admin commands ---
     "No pending members.": "Tidak ada anggota yang menunggu.",
     "Pending: {count}": "Menunggu: {count}",
-    "Approved.": "Disetujui.",
-    "Not found.": "Tidak ditemukan.",
-    "Removed.": "Dihapus.",
-    "Could not remove.": "Tidak dapat menghapus.",
-    "Banned.": "Diblokir.",
-    "Could not ban.": "Tidak dapat memblokir.",
-    "User {user_id} added to whitelist and approved.":
-        "Pengguna {user_id} ditambahkan ke whitelist dan disetujui.",
-    "User not found.": "Pengguna tidak ditemukan.",
     "Unknown key: {name}": "Kunci tidak dikenal: {name}",
     "Invalid integer for {name}: {value}": "Angka tidak valid untuk {name}: {value}",
     "Settings for chat {chat_id} updated.": "Pengaturan chat {chat_id} diperbarui.",
     "Chat not found.": "Chat tidak ditemukan.",
-    "yes": "ya",
-    "no": "tidak",
 
-    # --- Status display ---
-    "User: {user}\nChat: {chat_id}\nStatus: {status}\nJoined: {joined}\nWhitelisted: {wl}":
-        "Pengguna: {user}\nChat: {chat_id}\nStatus: {status}\nBergabung: {joined}\nWhitelisted: {wl}",
-    "Response: {text}": "Respons: {text}",
-    "AI: {result}": "AI: {result}",
     "Settings for chat {chat_id}:": "Pengaturan chat {chat_id}:",
 
     # --- AI validator ---

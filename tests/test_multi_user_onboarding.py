@@ -19,7 +19,6 @@ def make_cfg(**overrides):
     cfg = MagicMock()
     cfg.is_active = True
     cfg.ignore_bots = True
-    cfg.whitelist_enabled = True
     cfg.ai_validation_enabled = True
     cfg.timeout_minutes = 15
     cfg.min_response_length = 10
@@ -103,13 +102,13 @@ def apply_patches(stack: contextlib.ExitStack, db: FakeDB, cfg,
               side_effect=lambda *a, **kw: db.upsert(a[1])),
         patch("bot.services.onboarding.members.update_status",
               side_effect=db.update_status),
+        patch("bot.services.onboarding.members.set_whitelisted", new_callable=AsyncMock),
         patch("bot.services.onboarding.notifier.notify_new_member",
               side_effect=db.notify_new_member),
         patch("bot.services.onboarding.notifier.notify_response",
               side_effect=db.notify_response),
         patch("bot.services.onboarding.ai_validator.validate_response",
               return_value=ai_result or {"valid": True, "reason": "OK"}),
-        patch("bot.services.onboarding.events.log_event", new_callable=AsyncMock),
         patch("bot.services.onboarding.schedule_removal", schedule_mock or MagicMock()),
         patch("bot.services.onboarding.cancel_removal"),
     ]

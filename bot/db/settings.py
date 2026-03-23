@@ -22,8 +22,6 @@ class ChatSettings:
     min_response_length: int
     ai_validation_enabled: bool
     ban_on_remove: bool
-    ban_duration_hours: int | None
-    whitelist_enabled: bool
     ignore_bots: bool
     is_active: bool
 
@@ -64,8 +62,7 @@ async def update(chat_id: int, **kwargs) -> ChatSettings | None:
 
     allowed = {
         "chat_title", "welcome_text", "timeout_minutes", "min_response_length",
-        "ai_validation_enabled", "ban_on_remove", "ban_duration_hours",
-        "whitelist_enabled", "ignore_bots", "is_active",
+        "ai_validation_enabled", "ban_on_remove", "ignore_bots", "is_active",
     }
 
     set_parts = []
@@ -104,8 +101,6 @@ def _row_to_settings(row) -> ChatSettings:
         min_response_length=row["min_response_length"],
         ai_validation_enabled=bool(row["ai_validation_enabled"]),
         ban_on_remove=bool(row["ban_on_remove"]),
-        ban_duration_hours=row["ban_duration_hours"],
-        whitelist_enabled=bool(row["whitelist_enabled"]),
         ignore_bots=bool(row["ignore_bots"]),
         is_active=bool(row["is_active"]),
     )

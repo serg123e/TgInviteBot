@@ -17,10 +17,6 @@ log = logging.getLogger(__name__)
 router = Router(name="admin")
 
 
-def _is_admin_chat(chat_id: int) -> bool:
-    return chat_id == config.admin_chat_id
-
-
 # --- Inline button callbacks ---
 
 
@@ -125,126 +121,6 @@ async def cmd_pending(message: Message, bot: Bot) -> None:
     await message.reply(text[:4000])
 
 
-@router.message(Command("approve"), F.chat.id == config.admin_chat_id)
-async def cmd_approve(message: Message, bot: Bot) -> None:
-    """/approve <chat_id> <user_id|@username>"""
-    if not message.text:
-        return
-    args = message.text.split()
-    if len(args) < 3:
-        await message.reply("Usage: /approve <chat_id> <user_id>")
-        return
-
-    try:
-        chat_id = int(args[1])
-        user_id = int(args[2])
-    except ValueError:
-        await message.reply("Invalid arguments. Usage: /approve <chat_id> <user_id>")
-        return
-    ok = await onboarding.approve_member(bot, chat_id, user_id)
-    await message.reply(t("Approved.") if ok else t("Not found."))
-
-
-@router.message(Command("remove"), F.chat.id == config.admin_chat_id)
-async def cmd_remove(message: Message, bot: Bot) -> None:
-    """/remove <chat_id> <user_id>"""
-    if not message.text:
-        return
-    args = message.text.split()
-    if len(args) < 3:
-        await message.reply("Usage: /remove <chat_id> <user_id>")
-        return
-
-    try:
-        chat_id = int(args[1])
-        user_id = int(args[2])
-    except ValueError:
-        await message.reply("Invalid arguments. Usage: /remove <chat_id> <user_id>")
-        return
-    ok = await onboarding.remove_member(bot, chat_id, user_id)
-    await message.reply(t("Removed.") if ok else t("Could not remove."))
-
-
-@router.message(Command("ban"), F.chat.id == config.admin_chat_id)
-async def cmd_ban(message: Message, bot: Bot) -> None:
-    """/ban <chat_id> <user_id>"""
-    if not message.text:
-        return
-    args = message.text.split()
-    if len(args) < 3:
-        await message.reply("Usage: /ban <chat_id> <user_id>")
-        return
-
-    try:
-        chat_id = int(args[1])
-        user_id = int(args[2])
-    except ValueError:
-        await message.reply("Invalid arguments. Usage: /ban <chat_id> <user_id>")
-        return
-    ok = await onboarding.remove_member(bot, chat_id, user_id, ban=True)
-    await message.reply(t("Banned.") if ok else t("Could not ban."))
-
-
-@router.message(Command("whitelist"), F.chat.id == config.admin_chat_id)
-async def cmd_whitelist(message: Message, bot: Bot) -> None:
-    """/whitelist <chat_id> <user_id>"""
-    if not message.text:
-        return
-    args = message.text.split()
-    if len(args) < 3:
-        await message.reply("Usage: /whitelist <chat_id> <user_id>")
-        return
-
-    try:
-        chat_id = int(args[1])
-        user_id = int(args[2])
-    except ValueError:
-        await message.reply("Invalid arguments. Usage: /whitelist <chat_id> <user_id>")
-        return
-    member = await members.set_whitelisted(chat_id, user_id, True)
-    if member:
-        await onboarding.approve_member(bot, chat_id, user_id)
-        await message.reply(t("User {user_id} added to whitelist and approved.", user_id=user_id))
-    else:
-        await message.reply(t("User not found."))
-
-
-@router.message(Command("status"), F.chat.id == config.admin_chat_id)
-async def cmd_status(message: Message, bot: Bot) -> None:
-    """/status <chat_id> <user_id>"""
-    if not message.text:
-        return
-    args = message.text.split()
-    if len(args) < 3:
-        await message.reply("Usage: /status <chat_id> <user_id>")
-        return
-
-    try:
-        chat_id = int(args[1])
-        user_id = int(args[2])
-    except ValueError:
-        await message.reply("Invalid arguments. Usage: /status <chat_id> <user_id>")
-        return
-    member = await members.get_member(chat_id, user_id)
-    if not member:
-        await message.reply(t("User not found."))
-        return
-
-    display = user_display(member.username, member.first_name, user_id)
-    wl = t("yes") if member.is_whitelisted else t("no")
-    text = t(
-        "User: {user}\nChat: {chat_id}\nStatus: {status}\nJoined: {joined}\nWhitelisted: {wl}",
-        user=display, chat_id=chat_id, status=member.status,
-        joined=member.joined_at, wl=wl,
-    ) + "\n"
-    if member.response_text:
-        text += t("Response: {text}", text=member.response_text[:200]) + "\n"
-    if member.ai_validation_result:
-        text += t("AI: {result}", result=member.ai_validation_result) + "\n"
-
-    await message.reply(text)
-
-
 @router.message(Command("config"), F.chat.id == config.admin_chat_id)
 async def cmd_config(message: Message, bot: Bot) -> None:
     """/config <chat_id> [key=value ...]"""
@@ -255,8 +131,7 @@ async def cmd_config(message: Message, bot: Bot) -> None:
         await message.reply(
             "Usage: /config <chat_id> [key=value ...]\n\n"
             "Keys: timeout_minutes, min_response_length, ai_validation_enabled, "
-            "ban_on_remove, ban_duration_hours, whitelist_enabled, ignore_bots, "
-            "is_active, welcome_text"
+            "ban_on_remove, ignore_bots, is_active, welcome_text"
         )
         return
 
@@ -276,8 +151,6 @@ async def cmd_config(message: Message, bot: Bot) -> None:
             f"  min_response_length: {cfg.min_response_length}\n"
             f"  ai_validation_enabled: {cfg.ai_validation_enabled}\n"
             f"  ban_on_remove: {cfg.ban_on_remove}\n"
-            f"  ban_duration_hours: {cfg.ban_duration_hours}\n"
-            f"  whitelist_enabled: {cfg.whitelist_enabled}\n"
             f"  ignore_bots: {cfg.ignore_bots}\n"
             f"  is_active: {cfg.is_active}"
         )
@@ -286,8 +159,8 @@ async def cmd_config(message: Message, bot: Bot) -> None:
 
     # Parse key=value pairs
     updates: dict[str, Any] = {}
-    bool_keys = {"ai_validation_enabled", "ban_on_remove", "whitelist_enabled", "ignore_bots", "is_active"}
-    int_keys = {"timeout_minutes", "min_response_length", "ban_duration_hours"}
+    bool_keys = {"ai_validation_enabled", "ban_on_remove", "ignore_bots", "is_active"}
+    int_keys = {"timeout_minutes", "min_response_length"}
     str_keys = {"welcome_text"}
 
     for arg in args[2:]:
@@ -298,7 +171,7 @@ async def cmd_config(message: Message, bot: Bot) -> None:
             updates[key] = value.lower() in ("true", "1", "yes")
         elif key in int_keys:
             try:
-                updates[key] = int(value) if value.lower() != "null" else None
+                updates[key] = int(value)
             except ValueError:
                 await message.reply(t("Invalid integer for {name}: {value}", name=key, value=value))
                 return

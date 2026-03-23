@@ -24,7 +24,6 @@ class Config(BaseSettings):
     default_timeout_minutes: int = 15
     default_min_response_length: int = 10
     default_ai_validation: bool = True
-    default_whitelist_enabled: bool = True
     default_ban_on_remove: bool = False
 
 

@@ -34,27 +34,11 @@ MESSAGES: dict[str, str] = {
     # --- Admin commands ---
     "No pending members.": "कोई लंबित सदस्य नहीं।",
     "Pending: {count}": "लंबित: {count}",
-    "Approved.": "स्वीकृत।",
-    "Not found.": "नहीं मिला।",
-    "Removed.": "हटाया गया।",
-    "Could not remove.": "हटा नहीं सके।",
-    "Banned.": "प्रतिबंधित।",
-    "Could not ban.": "प्रतिबंधित नहीं कर सके।",
-    "User {user_id} added to whitelist and approved.":
-        "उपयोगकर्ता {user_id} को whitelist में जोड़ा और स्वीकृत किया गया।",
-    "User not found.": "उपयोगकर्ता नहीं मिला।",
     "Unknown key: {name}": "अज्ञात कुंजी: {name}",
     "Invalid integer for {name}: {value}": "{name} के लिए अमान्य संख्या: {value}",
     "Settings for chat {chat_id} updated.": "चैट {chat_id} की सेटिंग्स अपडेट की गईं।",
     "Chat not found.": "चैट नहीं मिला।",
-    "yes": "हाँ",
-    "no": "नहीं",
 
-    # --- Status display ---
-    "User: {user}\nChat: {chat_id}\nStatus: {status}\nJoined: {joined}\nWhitelisted: {wl}":
-        "उपयोगकर्ता: {user}\nचैट: {chat_id}\nस्थिति: {status}\nशामिल हुए: {joined}\nWhitelisted: {wl}",
-    "Response: {text}": "उत्तर: {text}",
-    "AI: {result}": "AI: {result}",
     "Settings for chat {chat_id}:": "चैट {chat_id} की सेटिंग्स:",
 
     # --- AI validator ---

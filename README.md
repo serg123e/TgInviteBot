@@ -10,12 +10,12 @@ A bot for automatic onboarding of new members in Telegram groups. It requires ne
 - **Multi-chat** — a single bot instance serves unlimited groups
 - **Per-chat settings** — timeout, response length, AI validation, and more
 - **Admin chat** — notifications with inline buttons (approve / remove / ban)
-- **Whitelist** — returning members skip re-onboarding
+- **Auto-whitelist** — approved members automatically skip re-onboarding on rejoin
 - **Timer recovery** after bot restart
 
 ## Tech Stack
 
-- Python 3.11+, aiogram 3.x, aiosqlite, APScheduler, OpenAI API
+- Python 3.11+, aiogram 3.x, aiosqlite, OpenAI API
 - SQLite (file-based DB, zero-config)
 
 ## Quick Start
@@ -59,7 +59,6 @@ docker-compose up -d
 | `DEFAULT_TIMEOUT_MINUTES` | Response timeout in minutes | `15` | no |
 | `DEFAULT_MIN_RESPONSE_LENGTH` | Minimum response length | `10` | no |
 | `DEFAULT_AI_VALIDATION` | Enable AI validation by default | `true` | no |
-| `DEFAULT_WHITELIST_ENABLED` | Enable whitelist by default | `true` | no |
 | `DEFAULT_BAN_ON_REMOVE` | Ban instead of kick on removal | `false` | no |
 
 \* Without an API key, AI validation is disabled and all responses are automatically approved.
@@ -71,7 +70,7 @@ docker-compose up -d
 1. **New member joins** — the bot detects the event via `chat_member` updates
 2. **Whitelist check** — if the member is whitelisted and the feature is enabled, onboarding is skipped
 3. **Welcome message** — a customizable greeting is sent, mentioning the user and the timeout
-4. **Timer starts** — APScheduler sets a deadline for the member to respond
+4. **Timer starts** — an asyncio task sets a deadline for the member to respond
 5. **Admin notified** — a notification is sent to `ADMIN_CHAT_ID`
 
 ### Response Handling
@@ -81,14 +80,15 @@ docker-compose up -d
 3. **Timer cancelled** — the scheduled removal is stopped
 4. **AI validation** — if enabled, OpenAI evaluates whether the text is a meaningful introduction
 5. **Status updated** — set to `approved` or `rejected`
-6. **Admin notified** — the response is forwarded with action buttons (Approve / Remove / Ban)
+6. **Auto-whitelist** — approved members are whitelisted and skip onboarding on rejoin
+7. **Admin notified** — the response is forwarded with action buttons (Approve / Remove / Ban)
 
 ### Timeout
 
 1. **Scheduler triggers** — `handle_timeout()` fires at the scheduled time
 2. **Ban or kick** — the bot removes the user via the Telegram API
 3. **Welcome message deleted** — the original greeting is cleaned up
-4. **Event logged** — the action is recorded in the `event_logs` table
+4. **Event logged** — the action is recorded in the application log
 
 ## Admin Commands
 
@@ -97,12 +97,9 @@ All commands and inline buttons work only in the admin chat (`ADMIN_CHAT_ID`). T
 | Command | Description |
 |---------|-------------|
 | `/pending [chat_id]` | List members awaiting a response |
-| `/approve <chat_id> <user_id>` | Manually approve a member |
-| `/remove <chat_id> <user_id>` | Remove (kick) a member |
-| `/ban <chat_id> <user_id>` | Ban a member |
-| `/whitelist <chat_id> <user_id>` | Add a member to the whitelist |
-| `/status <chat_id> <user_id>` | Show a member's onboarding status |
 | `/config <chat_id> [key=value ...]` | View or update chat settings |
+
+Admin actions (approve, remove, ban) are performed via **inline buttons** in the admin chat notifications.
 
 ### User Commands
 
@@ -118,8 +115,6 @@ All commands and inline buttons work only in the admin chat (`ADMIN_CHAT_ID`). T
 | `min_response_length` | Minimum response length | integer |
 | `ai_validation_enabled` | AI validation | `true` / `false` |
 | `ban_on_remove` | Ban on removal instead of kick | `true` / `false` |
-| `ban_duration_hours` | Ban duration (number or `null` for permanent) | integer / null |
-| `whitelist_enabled` | Whitelist feature | `true` / `false` |
 | `ignore_bots` | Ignore bot accounts | `true` / `false` |
 | `is_active` | Bot active in this chat | `true` / `false` |
 | `welcome_text` | Welcome message template (supports `{timeout}`, `{user}`) | string |
@@ -142,11 +137,10 @@ To add a new language, create `bot/i18n/<code>.py` with a `MESSAGES` dict mappin
 
 ## Database
 
-The bot uses SQLite with three tables:
+The bot uses SQLite with two tables:
 
 - **`chat_settings`** — per-group configuration (timeout, welcome text, feature flags)
 - **`group_members`** — individual onboarding state (status, response, AI result, timestamps)
-- **`event_logs`** — audit trail of all bot actions
 
 ### Member Statuses
 
@@ -197,8 +191,7 @@ bot/
 ├── db/                  # Database layer
 │   ├── connection.py    # aiosqlite connection management
 │   ├── members.py       # CRUD for group_members
-│   ├── settings.py      # CRUD for chat_settings
-│   └── events.py        # Event logging
+│   └── settings.py      # CRUD for chat_settings
 ├── handlers/            # Telegram event handlers
 │   ├── new_member.py    # New member joining
 │   ├── message.py       # Onboarding responses + /chatid
@@ -206,7 +199,7 @@ bot/
 │   └── admin.py         # Admin commands + inline buttons
 ├── services/            # Business logic
 │   ├── onboarding.py    # Core onboarding workflow
-│   ├── scheduler.py     # Timers (APScheduler)
+│   ├── scheduler.py     # Timers (asyncio tasks)
 │   ├── ai_validator.py  # OpenAI validation
 │   └── notifier.py      # Admin chat notifications
 ├── i18n/               # Localization
@@ -217,8 +210,6 @@ bot/
 │   ├── vi.py           # Vietnamese translations
 │   ├── id.py           # Indonesian translations
 │   └── es.py           # Spanish translations
-├── middlewares/
-│   └── rate_limit.py    # Rate limiting
 └── utils/
     └── template.py      # Template variable substitution
 

@@ -13,9 +13,8 @@ from bot.config import config
 from bot.db.connection import close_db, init_db
 from bot.handlers import admin, member_left, message, new_member
 from bot.i18n import load as load_i18n
-from bot.middlewares.rate_limit import RateLimitMiddleware
 from bot.services import onboarding
-from bot.services.scheduler import get_scheduler
+from bot.services.scheduler import cancel_all
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,10 +32,6 @@ async def on_startup(bot: Bot) -> None:
     await init_db(config.sqlite_path)
     log.info("Database ready: %s", config.sqlite_path)
 
-    scheduler = get_scheduler()
-    scheduler.start()
-    log.info("Scheduler started")
-
     # Restore pending timers
     count = await onboarding.restore_timers(bot)
     log.info("Restored %d pending timers", count)
@@ -46,9 +41,8 @@ async def on_startup(bot: Bot) -> None:
 
 
 async def on_shutdown(bot: Bot) -> None:
-    scheduler = get_scheduler()
-    scheduler.shutdown(wait=False)
-    log.info("Scheduler stopped")
+    cancel_all()
+    log.info("Pending timers cancelled")
 
     await close_db()
     log.info("Database disconnected")
@@ -68,9 +62,6 @@ async def main() -> None:
     )
 
     dp = Dispatcher()
-
-    # Middleware
-    dp.message.middleware(RateLimitMiddleware())
 
     # Register routers
     dp.include_router(new_member.router)

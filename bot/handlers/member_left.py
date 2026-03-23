@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from aiogram import Bot, Router
 from aiogram.types import ChatMemberUpdated
 
-from bot.db import events, members
+from bot.db import members
 from bot.services.scheduler import cancel_removal
 from bot.status import Status
 
@@ -35,5 +35,4 @@ async def on_member_left(event: ChatMemberUpdated, bot: Bot) -> None:
                 removed_at=datetime.now(timezone.utc),
                 removal_reason="left_voluntarily",
             )
-            await events.log_event("member_left", event.chat.id, user.id)
             log.info("Member %d left chat %d", user.id, event.chat.id)

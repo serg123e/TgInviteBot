@@ -34,27 +34,11 @@ MESSAGES: dict[str, str] = {
     # --- Admin commands ---
     "No pending members.": "Нет ожидающих участников.",
     "Pending: {count}": "Ожидающих: {count}",
-    "Approved.": "Одобрен.",
-    "Not found.": "Не найден.",
-    "Removed.": "Удалён.",
-    "Could not remove.": "Не удалось удалить.",
-    "Banned.": "Забанен.",
-    "Could not ban.": "Не удалось забанить.",
-    "User {user_id} added to whitelist and approved.":
-        "Пользователь {user_id} добавлен в whitelist и одобрен.",
-    "User not found.": "Пользователь не найден.",
     "Unknown key: {name}": "Неизвестный ключ: {name}",
     "Invalid integer for {name}: {value}": "Некорректное число для {name}: {value}",
     "Settings for chat {chat_id} updated.": "Настройки чата {chat_id} обновлены.",
     "Chat not found.": "Чат не найден.",
-    "yes": "да",
-    "no": "нет",
 
-    # --- Status display ---
-    "User: {user}\nChat: {chat_id}\nStatus: {status}\nJoined: {joined}\nWhitelisted: {wl}":
-        "Пользователь: {user}\nЧат: {chat_id}\nСтатус: {status}\nВступил: {joined}\nWhitelisted: {wl}",
-    "Response: {text}": "Ответ: {text}",
-    "AI: {result}": "AI: {result}",
     "Settings for chat {chat_id}:": "Настройки чата {chat_id}:",
 
     # --- AI validator ---

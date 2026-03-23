@@ -4,12 +4,10 @@ import json
 
 import pytest
 from hypothesis import given
-from hypothesis import settings as hsettings
 from hypothesis import strategies as st
 from pydantic import ValidationError
 
 from bot.i18n import t
-from bot.middlewares.rate_limit import MAX_TRACKED_CHATS, RateLimitMiddleware
 from bot.services.ai_validator import AIResult
 from bot.utils.template import render, user_display
 
@@ -140,26 +138,6 @@ def test_airesult_reason_defaults_empty(text):
     """AIResult with only valid field gets empty reason."""
     result = AIResult(valid=True)
     assert result.reason == ""
-
-
-# --- Rate limiter eviction ---
-
-
-@given(st.lists(st.integers(min_value=1, max_value=100_000), min_size=1, max_size=3000))
-@hsettings(max_examples=20)
-def test_rate_limiter_bounded_size(chat_ids):
-    """Rate limiter internal dicts never exceed MAX_TRACKED_CHATS."""
-    mw = RateLimitMiddleware(min_interval=0.0)
-
-    for cid in chat_ids:
-        # Simulate what __call__ does to _last_calls
-        mw._last_calls[cid] = 0.0
-        mw._last_calls.move_to_end(cid)
-        while len(mw._last_calls) > MAX_TRACKED_CHATS:
-            evicted_id, _ = mw._last_calls.popitem(last=False)
-            mw._locks.pop(evicted_id, None)
-
-    assert len(mw._last_calls) <= MAX_TRACKED_CHATS
 
 
 # --- ai_validation_result JSON round-trip ---

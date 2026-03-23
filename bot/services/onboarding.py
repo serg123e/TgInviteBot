@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
-from html import escape
+from datetime import datetime, timezone
 
 from aiogram import Bot
 
-from bot.db import events, members, settings
+from bot.db import members, settings
 from bot.i18n import t
 from bot.services import ai_validator, notifier
 from bot.services.scheduler import cancel_removal, schedule_removal
@@ -36,17 +35,18 @@ async def handle_new_member(
         log.info("Ignoring bot user %d in chat %d", user_id, chat_id)
         return
 
-    # Check whitelist
+    # Check whitelist (always on — approved members are auto-whitelisted)
     existing = await members.get_member(chat_id, user_id)
-    if existing and existing.is_whitelisted and cfg.whitelist_enabled:
+    if existing and existing.is_whitelisted:
         log.info("Whitelisted user %d rejoined chat %d", user_id, chat_id)
-        await events.log_event("whitelist_skip", chat_id, user_id)
         return
 
     # Upsert member
     await members.upsert_member(chat_id, user_id, username, first_name, last_name)
 
     # Send welcome message
+    from html import escape
+
     display = escape(username) if username else (escape(first_name) if first_name else str(user_id))
     mention = f"@{display}" if username else display
     if "{user}" in cfg.welcome_text:
@@ -69,7 +69,6 @@ async def handle_new_member(
         prompt_message_id=msg.message_id,
         **({"admin_message_id": admin_msg_id} if admin_msg_id else {}),
     )
-    await events.log_event("new_member", chat_id, user_id, {"username": username})
 
 
 async def handle_response(
@@ -117,11 +116,11 @@ async def handle_response(
 
     if new_status == Status.APPROVED:
         await bot.send_message(chat_id, t("Thanks for the introduction! Welcome to the group."))
-        await events.log_event("approved_auto", chat_id, user_id)
+        # Auto-whitelist approved members
+        await members.set_whitelisted(chat_id, user_id, True)
     else:
         # Re-schedule removal for pending_retry — give user time to try again
         schedule_removal(chat_id, user_id, cfg.timeout_minutes, bot)
-        await events.log_event("pending_retry_ai", chat_id, user_id, ai_result)
 
     # Notify admin with response details
     await notifier.notify_response(
@@ -140,11 +139,7 @@ async def handle_timeout(bot: Bot, chat_id: int, user_id: int) -> None:
 
     try:
         if cfg.ban_on_remove:
-            if cfg.ban_duration_hours is not None:
-                until = datetime.now(timezone.utc) + timedelta(hours=cfg.ban_duration_hours)
-                await bot.ban_chat_member(chat_id, user_id, until_date=until)
-            else:
-                await bot.ban_chat_member(chat_id, user_id)
+            await bot.ban_chat_member(chat_id, user_id)
         else:
             await bot.ban_chat_member(chat_id, user_id)
             await bot.unban_chat_member(chat_id, user_id)
@@ -153,11 +148,10 @@ async def handle_timeout(bot: Bot, chat_id: int, user_id: int) -> None:
         await members.update_status(chat_id, user_id, Status.ERROR, removal_reason=str(e))
         return
 
-    reason = "timeout"
     await members.update_status(
         chat_id, user_id, Status.REMOVED_TIMEOUT,
         removed_at=datetime.now(timezone.utc),
-        removal_reason=reason,
+        removal_reason="timeout",
     )
 
     # Delete welcome prompt message
@@ -171,7 +165,6 @@ async def handle_timeout(bot: Bot, chat_id: int, user_id: int) -> None:
         bot, chat_id, cfg.chat_title, user_id, member.username, member.first_name,
         admin_message_id=member.admin_message_id,
     )
-    await events.log_event("removed_timeout", chat_id, user_id, {"reason": reason})
 
 
 async def approve_member(bot: Bot, chat_id: int, user_id: int) -> bool:
@@ -182,7 +175,8 @@ async def approve_member(bot: Bot, chat_id: int, user_id: int) -> bool:
 
     cancel_removal(chat_id, user_id)
     await members.update_status(chat_id, user_id, Status.APPROVED)
-    await events.log_event("approved_manual", chat_id, user_id)
+    # Auto-whitelist approved members
+    await members.set_whitelisted(chat_id, user_id, True)
     return True
 
 
@@ -202,14 +196,11 @@ async def remove_member(bot: Bot, chat_id: int, user_id: int, ban: bool = False)
         log.error("Failed to remove user %d from chat %d: %s", user_id, chat_id, e)
         return False
 
-    status = Status.REMOVED_MANUAL
-    reason = "manual_ban" if ban else "manual_remove"
     await members.update_status(
-        chat_id, user_id, status,
+        chat_id, user_id, Status.REMOVED_MANUAL,
         removed_at=datetime.now(timezone.utc),
-        removal_reason=reason,
+        removal_reason="manual_ban" if ban else "manual_remove",
     )
-    await events.log_event(reason, chat_id, user_id)
     return True
 
 

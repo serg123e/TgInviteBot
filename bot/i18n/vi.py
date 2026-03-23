@@ -34,27 +34,11 @@ MESSAGES: dict[str, str] = {
     # --- Admin commands ---
     "No pending members.": "Không có thành viên đang chờ.",
     "Pending: {count}": "Đang chờ: {count}",
-    "Approved.": "Đã chấp nhận.",
-    "Not found.": "Không tìm thấy.",
-    "Removed.": "Đã xóa.",
-    "Could not remove.": "Không thể xóa.",
-    "Banned.": "Đã cấm.",
-    "Could not ban.": "Không thể cấm.",
-    "User {user_id} added to whitelist and approved.":
-        "Người dùng {user_id} đã được thêm vào whitelist và chấp nhận.",
-    "User not found.": "Không tìm thấy người dùng.",
     "Unknown key: {name}": "Khóa không xác định: {name}",
     "Invalid integer for {name}: {value}": "Số không hợp lệ cho {name}: {value}",
     "Settings for chat {chat_id} updated.": "Cài đặt cho chat {chat_id} đã được cập nhật.",
     "Chat not found.": "Không tìm thấy chat.",
-    "yes": "có",
-    "no": "không",
 
-    # --- Status display ---
-    "User: {user}\nChat: {chat_id}\nStatus: {status}\nJoined: {joined}\nWhitelisted: {wl}":
-        "Người dùng: {user}\nChat: {chat_id}\nTrạng thái: {status}\nTham gia: {joined}\nWhitelisted: {wl}",
-    "Response: {text}": "Phản hồi: {text}",
-    "AI: {result}": "AI: {result}",
     "Settings for chat {chat_id}:": "Cài đặt cho chat {chat_id}:",
 
     # --- AI validator ---
