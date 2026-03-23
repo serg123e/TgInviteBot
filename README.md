@@ -52,7 +52,7 @@ docker-compose up -d
 |----------|-------------|---------|:--------:|
 | `BOT_TOKEN` | Telegram bot token (from @BotFather) | — | yes |
 | `ADMIN_CHAT_ID` | Chat ID for admin notifications | — | yes |
-| `BOT_LANG` | Bot language (`en`, `ru`) | `en` | no |
+| `BOT_LANG` | Bot language (`en`, `ru`, `hi`, `pt`, `vi`, `id`, `es`) | `en` | no |
 | `SQLITE_PATH` | Path to SQLite file | `data/bot.db` | no |
 | `OPENAI_API_KEY` | OpenAI API key | — | no* |
 | `OPENAI_MODEL` | OpenAI model | `gpt-4.1-mini` | no |
@@ -122,16 +122,23 @@ All commands and inline buttons work only in the admin chat (`ADMIN_CHAT_ID`). T
 | `whitelist_enabled` | Whitelist feature | `true` / `false` |
 | `ignore_bots` | Ignore bot accounts | `true` / `false` |
 | `is_active` | Bot active in this chat | `true` / `false` |
-| `welcome_text` | Welcome message template (supports `{timeout}`) | string |
+| `welcome_text` | Welcome message template (supports `{timeout}`, `{user}`) | string |
 
 ## Localization
 
 The bot supports multiple languages via the `BOT_LANG` environment variable. All user-facing messages are defined as English keys that double as defaults.
 
-- `BOT_LANG=en` — English (default, uses keys as-is, no translation file needed)
-- `BOT_LANG=ru` — Russian (translations in `bot/i18n/ru.py`)
+| Code | Language | File |
+|------|----------|------|
+| `en` | English | (default, keys as-is) |
+| `ru` | Russian | `bot/i18n/ru.py` |
+| `hi` | Hindi | `bot/i18n/hi.py` |
+| `pt` | Portuguese | `bot/i18n/pt.py` |
+| `vi` | Vietnamese | `bot/i18n/vi.py` |
+| `id` | Indonesian | `bot/i18n/id.py` |
+| `es` | Spanish | `bot/i18n/es.py` |
 
-To add a new language, create `bot/i18n/<code>.py` with a `MESSAGES` dict mapping English keys to translations, then add the language code to the `load()` function in `bot/i18n/__init__.py`. Run `make test` to verify all keys are covered.
+To add a new language, create `bot/i18n/<code>.py` with a `MESSAGES` dict mapping English keys to translations, then add the language code to `SUPPORTED_LANGS` in `bot/i18n/__init__.py`. Run `make test` to verify all keys and placeholders are covered.
 
 ## Database
 
@@ -174,8 +181,11 @@ Set up automatic daily backups via cron:
 ## Tests
 
 ```bash
-pip install pytest pytest-asyncio
-pytest tests/
+pip install '.[dev]'
+make test          # Run test suite
+make lint          # Run all linters (ruff + mypy + pyright)
+make audit         # Check dependencies for known vulnerabilities
+make semgrep       # Static analysis (requires: pipx install semgrep)
 ```
 
 ## Project Structure
@@ -200,8 +210,13 @@ bot/
 │   ├── ai_validator.py  # OpenAI validation
 │   └── notifier.py      # Admin chat notifications
 ├── i18n/               # Localization
-│   ├── __init__.py     # t() translate function
-│   └── ru.py           # Russian translations
+│   ├── __init__.py     # t() translate function, dynamic loader
+│   ├── ru.py           # Russian translations
+│   ├── hi.py           # Hindi translations
+│   ├── pt.py           # Portuguese translations
+│   ├── vi.py           # Vietnamese translations
+│   ├── id.py           # Indonesian translations
+│   └── es.py           # Spanish translations
 ├── middlewares/
 │   └── rate_limit.py    # Rate limiting
 └── utils/
@@ -216,9 +231,11 @@ scripts/
 └── restore.sh           # Database restore
 
 tests/
-├── test_onboarding.py   # Onboarding logic tests
-├── test_ai_validator.py # AI validation tests
-└── test_template.py     # Template rendering tests
+├── test_onboarding.py       # Onboarding logic tests
+├── test_ai_validator.py     # AI validation tests
+├── test_template.py         # Template rendering tests
+├── test_i18n.py             # i18n completeness & placeholder tests
+└── test_hypothesis.py       # Property-based tests (Hypothesis)
 ```
 
 ## Deployment
