@@ -1,264 +1,354 @@
-# План реализации Telegram Onboarding Bot
+# Telegram Onboarding Bot — Implementation Plan
 
-## Доработки к исходному ТЗ
+This document describes the architecture, data model, and step-by-step implementation plan for the bot. It can be used to reproduce the project from scratch.
 
-### Уточнения
-- **OpenAI API** — используется для валидации ответов (осмысленность, не спам, не мусор)
-- **Приветствие** — отправляется только в группу, остаётся в чате
-- **Управление** — только через Telegram-команды в админском чате, без веб-панели
-- **Мульти-чат** — один бот обслуживает много групп, у каждой свои настройки
-- **Админский чат** — один общий для всех групп, туда приходят уведомления о новых участниках
+## Clarifications to the Original Spec
 
-### Добавленные компоненты (отсутствовали в ТЗ)
+### Assumptions
 
-1. **Таблица `chat_settings`** — per-chat конфигурация (приветствие, таймаут, мин. длина и т.д.)
-2. **AI-валидация ответов** — OpenAI оценивает, является ли ответ осмысленным представлением
-3. **Rate limiting** — очередь отправки сообщений для защиты от Telegram flood control
-4. **Проверка прав бота** — при добавлении в группу проверять, что бот — администратор
-5. **Скрипты бэкапа/восстановления** — pg_dump + скрипт для восстановления на другой БД
-6. **Миграции** — через SQL-файлы с версионированием
+- **OpenAI API** — used to validate responses (meaningfulness, not spam/junk)
+- **Welcome message** — sent directly to the group, stays in chat
+- **Management** — Telegram commands in a dedicated admin chat only, no web panel
+- **Multi-chat** — one bot instance serves many groups, each with independent settings
+- **Admin chat** — one shared chat for all groups; receives notifications about new members
 
----
+### Components Added Beyond Original Spec
 
-## Стек технологий
-
-| Компонент | Технология | Обоснование |
-|-----------|-----------|-------------|
-| Язык | Python 3.11+ | По требованию |
-| Бот-фреймворк | aiogram 3.x | Асинхронный, зрелый, middleware, роутеры |
-| БД | SQLite | Файловая, zero-config, лёгкая для деплоя |
-| DB-клиент | aiosqlite | Асинхронная обёртка над sqlite3 |
-| Таймеры | APScheduler | Персистентные джобы, легче Celery |
-| AI | OpenAI API (gpt-4o-mini) | Дешёвый и быстрый для валидации текста |
-| Конфиг | python-dotenv + БД | Глобальное в .env, per-chat в таблице |
-| Бэкапы | pg_dump + cron | Просто и надёжно |
+1. **`chat_settings` table** — per-chat configuration (welcome text, timeout, min length, etc.)
+2. **AI validation** — OpenAI evaluates whether a response is a meaningful introduction
+3. **Rate limiting** — message send queue to avoid Telegram flood control (429 errors)
+4. **Backup/restore scripts** — SQLite backup with rotation (last 30 copies)
+5. **SQL migrations** — versioned `.sql` files with a Python runner
 
 ---
 
-## Модель данных (доработанная)
+## Tech Stack
 
-### Таблица `chat_settings`
+| Component | Technology | Rationale |
+|-----------|-----------|-----------|
+| Language | Python 3.11+ | Per requirements |
+| Bot framework | aiogram 3.x | Async, mature, middleware + routers |
+| Database | SQLite | File-based, zero-config, easy to deploy |
+| DB client | aiosqlite | Async wrapper over sqlite3 |
+| Timers | APScheduler 3.10+ | Persistent jobs, lighter than Celery |
+| AI | OpenAI API (gpt-4o-mini) | Cheap and fast for text validation |
+| Config | python-dotenv + DB | Global in `.env`, per-chat in `chat_settings` |
+| Validation | Pydantic 2.5+ | Config and data validation |
+| Backups | sqlite3 `.backup` + cron | Simple and reliable |
+
+---
+
+## Data Model
+
+### Table: `chat_settings`
+
 ```sql
 CREATE TABLE chat_settings (
-    id BIGSERIAL PRIMARY KEY,
-    chat_id BIGINT UNIQUE NOT NULL,
-    chat_title TEXT,
-    welcome_text TEXT NOT NULL DEFAULT 'Здравствуйте! Представьтесь в течение {timeout} минут.',
-    timeout_minutes INT NOT NULL DEFAULT 15,
-    min_response_length INT NOT NULL DEFAULT 10,
-    ai_validation_enabled BOOLEAN NOT NULL DEFAULT TRUE,
-    ban_on_remove BOOLEAN NOT NULL DEFAULT FALSE,
-    ban_duration_hours INT DEFAULT NULL,  -- NULL = перманентный бан, если ban_on_remove=true
-    whitelist_enabled BOOLEAN NOT NULL DEFAULT TRUE,
-    ignore_bots BOOLEAN NOT NULL DEFAULT TRUE,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id     INTEGER UNIQUE NOT NULL,
+    chat_title  TEXT,
+    welcome_text TEXT NOT NULL DEFAULT 'Здравствуйте! Представьтесь, пожалуйста, в течение {timeout} минут: напишите кто вы и чем занимаетесь.',
+    timeout_minutes   INTEGER NOT NULL DEFAULT 15,
+    min_response_length INTEGER NOT NULL DEFAULT 10,
+    ai_validation_enabled INTEGER NOT NULL DEFAULT 1,
+    ban_on_remove     INTEGER NOT NULL DEFAULT 0,
+    ban_duration_hours INTEGER DEFAULT NULL,   -- NULL = permanent ban when ban_on_remove=1
+    whitelist_enabled INTEGER NOT NULL DEFAULT 1,
+    ignore_bots       INTEGER NOT NULL DEFAULT 1,
+    is_active         INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 ```
 
-### Таблица `group_members`
+### Table: `group_members`
+
 ```sql
 CREATE TABLE group_members (
-    id BIGSERIAL PRIMARY KEY,
-    chat_id BIGINT NOT NULL,
-    telegram_user_id BIGINT NOT NULL,
-    username TEXT,
-    first_name TEXT,
-    last_name TEXT,
-    joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    prompt_sent_at TIMESTAMPTZ,
-    prompt_message_id BIGINT,  -- для возможного удаления приветствия
-    response_text TEXT,
-    responded_at TIMESTAMPTZ,
-    ai_validation_result JSONB,  -- результат проверки OpenAI
-    status TEXT NOT NULL DEFAULT 'joined',
-    removed_at TIMESTAMPTZ,
-    removal_reason TEXT,
-    is_whitelisted BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id           INTEGER NOT NULL,
+    telegram_user_id  INTEGER NOT NULL,
+    username          TEXT,
+    first_name        TEXT,
+    last_name         TEXT,
+    joined_at         TEXT NOT NULL DEFAULT (datetime('now')),
+    prompt_sent_at    TEXT,
+    prompt_message_id INTEGER,          -- for deleting the welcome message later
+    response_text     TEXT,
+    responded_at      TEXT,
+    ai_validation_result TEXT,          -- JSON string: {"valid": bool, "reason": "..."}
+    status            TEXT NOT NULL DEFAULT 'joined',
+    removed_at        TEXT,
+    removal_reason    TEXT,
+    is_whitelisted    INTEGER NOT NULL DEFAULT 0,
+    created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(chat_id, telegram_user_id)
 );
 ```
 
-### Таблица `event_logs`
+### Table: `event_logs`
+
 ```sql
 CREATE TABLE event_logs (
-    id BIGSERIAL PRIMARY KEY,
-    chat_id BIGINT,
-    telegram_user_id BIGINT,
-    event_type TEXT NOT NULL,
-    details JSONB,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id          INTEGER,
+    telegram_user_id INTEGER,
+    event_type       TEXT NOT NULL,
+    details          TEXT,              -- JSON string
+    created_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
 ```
 
-### Статусы (enum-like)
-- `joined` — вошёл в группу
-- `prompt_sent` — приветствие отправлено
-- `responded` — ответил (ожидает AI-валидацию)
-- `approved` — одобрен (автоматически или модератором)
-- `rejected` — ответ не прошёл AI-валидацию, ожидает решения модератора
-- `removed_no_response` — удалён за молчание
-- `removed_rejected` — удалён после отклонения ответа
-- `removed_manual` — удалён модератором
-- `left` — ушёл сам
-- `error` — ошибка обработки
+### Indexes
+
+```sql
+CREATE INDEX idx_members_chat_status ON group_members(chat_id, status);
+CREATE INDEX idx_members_chat_user   ON group_members(chat_id, telegram_user_id);
+CREATE INDEX idx_events_chat         ON event_logs(chat_id, created_at);
+```
+
+### Member Statuses
+
+| Status | Meaning |
+|--------|---------|
+| `joined` | Entered the group |
+| `prompt_sent` | Welcome message sent |
+| `approved` | Passed validation (auto or manual) |
+| `rejected` | Failed AI validation, awaiting admin decision |
+| `removed_timeout` | Removed for not responding in time |
+| `removed_rejected` | Removed after admin confirmed rejection |
+| `removed_manual` | Removed by admin directly |
+| `left` | Left the group voluntarily |
+| `error` | Processing error |
 
 ---
 
-## Структура проекта
+## Project Structure
 
 ```
 TgInviteBot/
 ├── bot/
 │   ├── __init__.py
-│   ├── main.py              # Точка входа, инициализация бота
-│   ├── config.py             # Загрузка .env, глобальные настройки
+│   ├── main.py              # Entry point: dispatcher, lifecycle, router registration
+│   ├── config.py            # Load .env, global settings (Pydantic)
 │   ├── db/
 │   │   ├── __init__.py
-│   │   ├── connection.py     # Пул соединений asyncpg
-│   │   ├── members.py        # CRUD для group_members
-│   │   ├── settings.py       # CRUD для chat_settings
-│   │   └── events.py         # Запись event_logs
+│   │   ├── connection.py    # aiosqlite connection (WAL mode)
+│   │   ├── members.py       # CRUD for group_members
+│   │   ├── settings.py      # CRUD for chat_settings
+│   │   └── events.py        # Insert into event_logs
 │   ├── handlers/
 │   │   ├── __init__.py
-│   │   ├── new_member.py     # Обработка входа нового участника
-│   │   ├── message.py        # Обработка сообщений (ответов на onboarding)
-│   │   ├── member_left.py    # Обработка выхода участника
-│   │   └── admin.py          # Админ-команды
+│   │   ├── new_member.py    # chat_member update → new member detected
+│   │   ├── message.py       # Text messages (onboarding responses) + /chatid
+│   │   ├── member_left.py   # chat_member update → member left
+│   │   └── admin.py         # Admin commands + inline button callbacks
 │   ├── services/
 │   │   ├── __init__.py
-│   │   ├── onboarding.py     # Бизнес-логика onboarding
-│   │   ├── scheduler.py      # APScheduler — таймеры удаления
-│   │   ├── ai_validator.py   # Валидация через OpenAI
-│   │   └── notifier.py       # Уведомления в админский чат
+│   │   ├── onboarding.py    # Core workflow: handle_new_member, handle_response,
+│   │   │                    #   handle_timeout, approve_member, remove_member,
+│   │   │                    #   restore_timers
+│   │   ├── scheduler.py     # APScheduler: schedule_removal, cancel_removal
+│   │   ├── ai_validator.py  # OpenAI: validate_response → {"valid", "reason"}
+│   │   └── notifier.py      # Admin chat: notify_new_member, notify_response,
+│   │                        #   notify_timeout (with inline buttons)
 │   ├── middlewares/
 │   │   ├── __init__.py
-│   │   └── rate_limit.py     # Rate limiting для Telegram API
+│   │   └── rate_limit.py    # 50ms minimum interval between handler calls
 │   └── utils/
 │       ├── __init__.py
-│       └── template.py       # Подстановка переменных в шаблоны
+│       └── template.py      # Simple {key} placeholder substitution
 ├── migrations/
-│   ├── 001_initial.sql
-│   └── run_migrations.py
+│   ├── 001_initial.sql      # Schema: 3 tables + 3 indexes
+│   └── run_migrations.py    # Reads SQL files, tracks applied via _migrations table
 ├── scripts/
-│   ├── backup.sh             # pg_dump скрипт
-│   └── restore.sh            # Восстановление на другую БД
+│   ├── backup.sh            # sqlite3 .backup, keeps last 30 copies
+│   └── restore.sh           # Copies backup file to SQLITE_PATH
 ├── tests/
-│   ├── test_onboarding.py
-│   ├── test_ai_validator.py
-│   └── test_template.py
+│   ├── test_onboarding.py   # Bot-ignoring, whitelist bypass
+│   ├── test_ai_validator.py # No API key, valid/invalid responses
+│   └── test_template.py     # Placeholder rendering
 ├── .env.example
 ├── requirements.txt
-├── Dockerfile
-├── docker-compose.yml
-└── README.md
+├── Dockerfile               # Python 3.11-slim, /app/data volume
+├── docker-compose.yml       # Single service, volume for SQLite
+├── README.md                # English documentation
+├── DEPLOY.md                # Deployment guide (systemd, Docker, cron)
+└── PLAN.md                  # This file
 ```
 
 ---
 
-## Этапы реализации
-
-### Этап 1: Фундамент (каркас)
-1. Инициализация проекта: requirements.txt, .env.example, config.py
-2. Подключение к Supabase (asyncpg)
-3. SQL-миграции — создание таблиц
-4. Базовый бот на aiogram 3 — запуск, регистрация роутеров
-
-### Этап 2: Основной сценарий onboarding
-5. Обработчик входа нового участника (new_member handler)
-6. Отправка приветственного сообщения с шаблоном
-7. APScheduler — таймер на удаление через N минут
-8. Обработчик сообщений — распознавание ответа на onboarding
-9. Удаление участника при отсутствии ответа
-10. Сохранение ответа в БД, смена статуса
-
-### Этап 3: AI-валидация
-11. Интеграция OpenAI API — проверка осмысленности ответа
-12. Логика: ответ прошёл → approved, не прошёл → rejected + уведомление модераторам
-
-### Этап 4: Мульти-чат + админский чат
-13. Таблица chat_settings — per-chat конфигурация
-14. Уведомления в админский чат (новый участник представился + кнопки)
-15. Обработка inline-кнопок (одобрить/удалить/забанить)
-
-### Этап 5: Админ-команды
-16. /pending — список ожидающих
-17. /approve @username — одобрить
-18. /remove @username — удалить
-19. /whitelist @username — добавить в whitelist
-20. /status @username — статус пользователя
-21. /config — показать/изменить настройки чата
-
-### Этап 6: Whitelist + edge cases
-22. Whitelist логика — пропуск повторного входа
-23. Обработка выхода участника (закрытие сценария)
-24. Обработка дублирования событий от Telegram
-25. Проверка прав бота при добавлении в группу
-26. Восстановление таймеров после перезапуска
-
-### Этап 7: Инфраструктура
-27. Скрипты бэкапа/восстановления БД
-28. Dockerfile + docker-compose
-29. Логирование (structured logging)
-30. Базовые тесты
-
-### Этап 8: Документация
-31. README с инструкциями запуска и деплоя
-32. Описание переменных окружения
-33. Описание админ-команд
-34. Ограничения решения
-
----
-
-## Ключевые решения
-
-### Как распознать ответ на onboarding?
-Бот считает ответом **любое текстовое сообщение** от пользователя со статусом `joined` или `prompt_sent` в данном чате. Не reply на конкретное сообщение, а просто первое текстовое сообщение. Стикеры, фото, голосовые — игнорируются (с уведомлением "пожалуйста, напишите текстом").
-
-### Как работает AI-валидация?
-Промпт для GPT-4o-mini:
-```
-Пользователь вступил в группу и должен представиться.
-Оцени, является ли следующий текст осмысленным представлением (имя, чем занимается, зачем пришёл).
-Ответь JSON: {"valid": true/false, "reason": "краткое пояснение"}
-Текст: "{response_text}"
-```
-Если valid=true → статус `approved`. Если false → статус `rejected`, уведомление модераторам.
-
-### Как работают таймеры после перезапуска?
-При старте бот запрашивает из БД всех участников со статусами `joined`/`prompt_sent`, считает оставшееся время (timeout - (now - joined_at)), и ставит таймеры через APScheduler. Если время уже истекло — сразу запускает удаление.
-
-### Rate limiting
-Очередь отправки сообщений с интервалом 50мс между сообщениями (Telegram лимит ~30 msg/sec для бота). При 429 ошибке — exponential backoff.
-
----
-
-## Переменные окружения
+## Environment Variables
 
 ```env
 # Telegram
-BOT_TOKEN=
-ADMIN_CHAT_ID=
+BOT_TOKEN=                          # required — from @BotFather
+ADMIN_CHAT_ID=                      # required — chat ID for admin notifications
 
-# Supabase / PostgreSQL
-DATABASE_URL=postgresql://user:pass@host:port/db
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_KEY=
+# Database
+SQLITE_PATH=data/bot.db             # optional — default: data/bot.db
 
 # OpenAI
-OPENAI_API_KEY=
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_API_KEY=                     # optional — without it, AI validation is disabled
+OPENAI_MODEL=gpt-4o-mini            # optional — default: gpt-4o-mini
 
-# Defaults (можно переопределить per-chat через команды)
+# Defaults (can be overridden per-chat via /config command)
 DEFAULT_TIMEOUT_MINUTES=15
 DEFAULT_MIN_RESPONSE_LENGTH=10
 DEFAULT_AI_VALIDATION=true
 DEFAULT_WHITELIST_ENABLED=true
 DEFAULT_BAN_ON_REMOVE=false
+```
 
-# Backup
-BACKUP_DIR=/backups
+---
+
+## Implementation Steps
+
+### Phase 1: Foundation
+
+1. Initialize project: `requirements.txt`, `.env.example`, `config.py` (Pydantic settings)
+2. Set up aiosqlite connection (`bot/db/connection.py`) with WAL mode
+3. Create SQL migration (`migrations/001_initial.sql`) — 3 tables, 3 indexes
+4. Write migration runner (`migrations/run_migrations.py`) — tracks via `_migrations` table
+5. Basic aiogram 3 bot (`bot/main.py`) — dispatcher, startup/shutdown lifecycle, router registration
+
+### Phase 2: Core Onboarding Flow
+
+6. New member handler (`bot/handlers/new_member.py`) — detect via `chat_member` update
+7. Welcome message with template rendering (`bot/utils/template.py`) — `{timeout}` placeholder
+8. APScheduler integration (`bot/services/scheduler.py`) — `schedule_removal()`, `cancel_removal()`
+9. Message handler (`bot/handlers/message.py`) — detect text responses from pending users
+10. Timeout handler — remove user, delete welcome message, log event
+11. Save response to DB, update status
+
+### Phase 3: AI Validation
+
+12. OpenAI integration (`bot/services/ai_validator.py`):
+    - System prompt: evaluate if text is a meaningful introduction
+    - Response format: `{"valid": true/false, "reason": "brief explanation"}`
+    - Temperature: 0.1 for deterministic output
+    - Graceful fallback: auto-approve on API error, missing key, or JSON parse failure
+13. Validation logic: `valid=true` → `approved`; `valid=false` → `rejected` + admin notification
+
+### Phase 4: Multi-Chat + Admin Notifications
+
+14. Per-chat settings CRUD (`bot/db/settings.py`) — `get_or_create()`, `update()`
+15. Admin notifications (`bot/services/notifier.py`):
+    - `notify_new_member()` — user joined, prompt sent
+    - `notify_response()` — user replied, with inline buttons (Approve / Remove / Ban)
+    - `notify_timeout()` — user removed for inactivity
+16. Inline button callbacks in `bot/handlers/admin.py` — parse `action:chat_id:user_id`
+
+### Phase 5: Admin Commands
+
+All commands restricted to `ADMIN_CHAT_ID`:
+
+17. `/pending [chat_id]` — list members with `joined` / `prompt_sent` status
+18. `/approve <chat_id> <user_id>` — manually approve a member
+19. `/remove <chat_id> <user_id>` — kick a member
+20. `/ban <chat_id> <user_id>` — ban a member (respects `ban_duration_hours`)
+21. `/whitelist <chat_id> <user_id>` — add to whitelist
+22. `/status <chat_id> <user_id>` — show onboarding status details
+23. `/config <chat_id> [key=value ...]` — view or update chat settings
+24. `/chatid` — user command, works in any chat, shows the chat ID
+
+### Phase 6: Whitelist + Edge Cases
+
+25. Whitelist logic — skip onboarding for returning members (when `whitelist_enabled`)
+26. Member left handler (`bot/handlers/member_left.py`) — update status to `left`, cancel timer
+27. Re-entry handling — `upsert_member()` resets status and clears previous response
+28. Timer recovery after restart — `restore_timers()` on startup:
+    - Query all `joined`/`prompt_sent` members
+    - Calculate remaining time: `timeout - (now - joined_at)`
+    - If remaining > 0: reschedule timer
+    - If expired: remove immediately
+
+### Phase 7: Infrastructure
+
+29. Rate limiting middleware (`bot/middlewares/rate_limit.py`) — 50ms async lock
+30. Backup script (`scripts/backup.sh`) — `sqlite3 $DB .backup`, rotate last 30
+31. Restore script (`scripts/restore.sh`) — copy backup to `SQLITE_PATH`
+32. Dockerfile — Python 3.11-slim, `/app/data` directory, run `python -m bot.main`
+33. docker-compose.yml — single service, named volume for SQLite persistence
+
+### Phase 8: Testing
+
+34. `tests/test_template.py` — placeholder rendering (basic, multiple, missing keys)
+35. `tests/test_ai_validator.py` — mock OpenAI (no key, valid, invalid responses)
+36. `tests/test_onboarding.py` — mock bot + DB (ignore bots, whitelist bypass)
+
+### Phase 9: Documentation
+
+37. `README.md` — features, quick start, env vars, commands, database, project structure, comparison with alternatives
+38. `DEPLOY.md` — systemd service, Docker, cron backups, update procedure
+39. `.env.example` — annotated environment template
+
+---
+
+## Key Design Decisions
+
+### How does the bot recognize an onboarding response?
+
+Any **text message** from a user with status `joined` or `prompt_sent` in that chat is treated as their introduction. It doesn't have to be a reply to the welcome message — just the first text message. Non-text content (stickers, photos, voice) is ignored with a reminder to write text.
+
+### How does AI validation work?
+
+System prompt for GPT-4o-mini:
+```
+You are a group moderator. A user joined and must introduce themselves.
+Evaluate whether the text is a meaningful introduction (name, occupation, reason for joining).
+Reply with ONLY valid JSON without markdown: {"valid": true/false, "reason": "brief explanation"}
+```
+
+- `valid=true` → status set to `approved`
+- `valid=false` → status set to `rejected`, admin notified with action buttons
+- API error / missing key / parse failure → auto-approve (graceful degradation)
+
+### How do timers survive a bot restart?
+
+On startup, `restore_timers()` queries the DB for all members with `joined` or `prompt_sent` status. For each:
+- Calculate elapsed time: `now - joined_at`
+- If `elapsed < timeout` → schedule removal after `timeout - elapsed`
+- If `elapsed >= timeout` → execute removal immediately
+
+### Rate limiting strategy
+
+A simple async-lock middleware enforces a minimum 50ms gap between handler executions. This keeps the bot under Telegram's ~30 messages/second limit. On 429 errors from the Telegram API, aiogram handles retry automatically.
+
+### Why SQLite instead of PostgreSQL?
+
+- Zero-config: no database server to install or manage
+- Single-file: trivial backups (`sqlite3 .backup`), easy to migrate
+- Sufficient performance: a single bot instance handles the expected load
+- WAL mode: enables concurrent reads during writes
+
+### Router registration order
+
+In `main.py`, routers are registered in this order:
+1. `new_member` — chat_member updates (new member)
+2. `member_left` — chat_member updates (member left)
+3. `admin` — admin commands (filtered by chat ID)
+4. `message` — **must be last** — catch-all for text messages
+
+The message router is last because it acts as a catch-all for text in groups.
+
+---
+
+## Dependencies
+
+```
+aiogram>=3.4,<4.0
+aiosqlite>=0.19,<1.0
+apscheduler>=3.10,<4.0
+openai>=1.12,<2.0
+python-dotenv>=1.0,<2.0
+pydantic>=2.5,<3.0
+```
+
+Dev dependencies (not in `requirements.txt`):
+```
+pytest
+pytest-asyncio
 ```
