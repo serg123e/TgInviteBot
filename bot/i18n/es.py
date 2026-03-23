@@ -34,6 +34,7 @@ MESSAGES: dict[str, str] = {
     # --- Admin commands ---
     "No pending members.": "No hay miembros pendientes.",
     "Pending: {count}": "Pendientes: {count}",
+    "User not found.": "Usuario no encontrado.",
     "Unknown key: {name}": "Clave desconocida: {name}",
     "Invalid integer for {name}: {value}": "Número inválido para {name}: {value}",
     "Settings for chat {chat_id} updated.": "Configuración del chat {chat_id} actualizada.",

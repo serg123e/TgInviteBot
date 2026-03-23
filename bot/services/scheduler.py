@@ -22,9 +22,12 @@ def schedule_removal(chat_id: int, user_id: int, timeout_minutes: float, bot) ->
             await asyncio.sleep(timeout_minutes * 60)
         except asyncio.CancelledError:
             return
-        # Import here to avoid circular import at module level
-        from bot.services import onboarding
-        await onboarding.handle_timeout(bot, chat_id, user_id)
+        try:
+            # Import here to avoid circular import at module level
+            from bot.services import onboarding
+            await onboarding.handle_timeout(bot, chat_id, user_id)
+        finally:
+            _tasks.pop(key, None)
 
     _tasks[key] = asyncio.create_task(_run())
     log.info("Scheduled removal for user %d in chat %d in %.1f min", user_id, chat_id, timeout_minutes)

@@ -97,6 +97,7 @@ All commands and inline buttons work only in the admin chat (`ADMIN_CHAT_ID`). T
 | Command | Description |
 |---------|-------------|
 | `/pending [chat_id]` | List members awaiting a response |
+| `/status <chat_id> <user_id>` | Show a member's onboarding status |
 | `/config <chat_id> [key=value ...]` | View or update chat settings |
 
 Admin actions (approve, remove, ban) are performed via **inline buttons** in the admin chat notifications.

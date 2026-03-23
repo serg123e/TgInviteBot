@@ -34,6 +34,7 @@ MESSAGES: dict[str, str] = {
     # --- Admin commands ---
     "No pending members.": "Không có thành viên đang chờ.",
     "Pending: {count}": "Đang chờ: {count}",
+    "User not found.": "Không tìm thấy người dùng.",
     "Unknown key: {name}": "Khóa không xác định: {name}",
     "Invalid integer for {name}: {value}": "Số không hợp lệ cho {name}: {value}",
     "Settings for chat {chat_id} updated.": "Cài đặt cho chat {chat_id} đã được cập nhật.",

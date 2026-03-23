@@ -34,6 +34,7 @@ MESSAGES: dict[str, str] = {
     # --- Admin commands ---
     "No pending members.": "Нет ожидающих участников.",
     "Pending: {count}": "Ожидающих: {count}",
+    "User not found.": "Пользователь не найден.",
     "Unknown key: {name}": "Неизвестный ключ: {name}",
     "Invalid integer for {name}: {value}": "Некорректное число для {name}: {value}",
     "Settings for chat {chat_id} updated.": "Настройки чата {chat_id} обновлены.",

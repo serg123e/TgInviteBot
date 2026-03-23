@@ -34,6 +34,7 @@ MESSAGES: dict[str, str] = {
     # --- Admin commands ---
     "No pending members.": "Tidak ada anggota yang menunggu.",
     "Pending: {count}": "Menunggu: {count}",
+    "User not found.": "Pengguna tidak ditemukan.",
     "Unknown key: {name}": "Kunci tidak dikenal: {name}",
     "Invalid integer for {name}: {value}": "Angka tidak valid untuk {name}: {value}",
     "Settings for chat {chat_id} updated.": "Pengaturan chat {chat_id} diperbarui.",

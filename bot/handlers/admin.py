@@ -121,6 +121,44 @@ async def cmd_pending(message: Message, bot: Bot) -> None:
     await message.reply(text[:4000])
 
 
+@router.message(Command("status"), F.chat.id == config.admin_chat_id)
+async def cmd_status(message: Message, bot: Bot) -> None:
+    """/status <chat_id> <user_id>"""
+    if not message.text:
+        return
+    args = message.text.split()
+    if len(args) < 3:
+        await message.reply("Usage: /status <chat_id> <user_id>")
+        return
+
+    try:
+        chat_id = int(args[1])
+        user_id = int(args[2])
+    except ValueError:
+        await message.reply("Usage: /status <chat_id> <user_id>")
+        return
+    member = await members.get_member(chat_id, user_id)
+    if not member:
+        await message.reply(t("User not found."))
+        return
+
+    display = user_display(member.username, member.first_name, user_id)
+    wl = "yes" if member.is_whitelisted else "no"
+    text = (
+        f"User: {display}\n"
+        f"Chat: {chat_id}\n"
+        f"Status: {member.status}\n"
+        f"Joined: {member.joined_at}\n"
+        f"Whitelisted: {wl}"
+    )
+    if member.response_text:
+        text += f"\nResponse: {member.response_text[:200]}"
+    if member.ai_validation_result:
+        text += f"\nAI: {member.ai_validation_result}"
+
+    await message.reply(text)
+
+
 @router.message(Command("config"), F.chat.id == config.admin_chat_id)
 async def cmd_config(message: Message, bot: Bot) -> None:
     """/config <chat_id> [key=value ...]"""
