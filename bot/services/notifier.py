@@ -75,7 +75,7 @@ async def notify_response(
     if admin_message_id:
         try:
             await bot.edit_message_text(
-                text, config.admin_chat_id, admin_message_id,  # type: ignore[arg-type]
+                text=text, chat_id=config.admin_chat_id, message_id=admin_message_id,
                 parse_mode="HTML", reply_markup=keyboard,
             )
             return
@@ -103,7 +103,7 @@ async def notify_timeout(
     if admin_message_id:
         try:
             await bot.edit_message_text(
-                text, config.admin_chat_id, admin_message_id,  # type: ignore[arg-type]
+                text=text, chat_id=config.admin_chat_id, message_id=admin_message_id,
                 parse_mode="HTML",
             )
             return
@@ -144,7 +144,7 @@ async def notify_error(
     if admin_message_id:
         try:
             await bot.edit_message_text(
-                text, config.admin_chat_id, admin_message_id,  # type: ignore[arg-type]
+                text=text, chat_id=config.admin_chat_id, message_id=admin_message_id,
                 parse_mode="HTML", reply_markup=keyboard,
             )
             return
