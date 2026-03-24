@@ -62,6 +62,8 @@ async def on_chat_member_update(event: ChatMemberUpdated, bot: Bot) -> None:
 @router.message(lambda msg: bool(msg.new_chat_members))
 async def on_new_chat_members(message: Message, bot: Bot) -> None:
     """Handle new members via service message (new_chat_members)."""
+    if not message.new_chat_members:
+        return
     for user in message.new_chat_members:
         if user.id == bot.id:
             continue
