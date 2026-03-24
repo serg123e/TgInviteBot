@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS chat_settings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     chat_id INTEGER UNIQUE NOT NULL,
     chat_title TEXT,
-    welcome_text TEXT NOT NULL DEFAULT 'Здравствуйте! Представьтесь, пожалуйста, в течение {timeout} минут: напишите кто вы, чем занимаетесь и зачем пришли в группу.',
+    welcome_text TEXT NOT NULL DEFAULT 'Здравствуйте, {user}! Представьтесь, пожалуйста, в течение {timeout} минут: напишите кто вы, чем занимаетесь и зачем пришли в группу.',
     timeout_minutes INTEGER NOT NULL DEFAULT 30,
     min_response_length INTEGER NOT NULL DEFAULT 50,
     ai_validation_enabled INTEGER NOT NULL DEFAULT 1,

@@ -8,7 +8,7 @@ from bot.db.connection import get_db
 log = logging.getLogger(__name__)
 
 DEFAULT_WELCOME = (
-    "Здравствуйте! Представьтесь, пожалуйста, в течение {timeout} минут: "
+    "Здравствуйте, {user}! Представьтесь, пожалуйста, в течение {timeout} минут: "
     "напишите кто вы, чем занимаетесь и зачем пришли в группу."
 )
 
