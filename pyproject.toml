@@ -8,6 +8,7 @@ requires-python = ">=3.11"
 dependencies = [
     "aiogram>=3.4,<4.0",
     "aiosqlite>=0.19,<1.0",
+    "cachetools>=5.3,<6.0",
     "openai>=1.12,<2.0",
     "python-dotenv>=1.0,<2.0",
     "pydantic>=2.5,<3.0",
@@ -22,6 +23,7 @@ dev = [
     "hypothesis>=6.100",
     "ruff>=0.4",
     "mypy>=1.9",
+    "types-cachetools>=5.3",
     "pyright>=1.1",
     "pip-audit>=2.7",
 ]

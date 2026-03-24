@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import logging
-import time
 
 from aiogram import Bot, Router
 from aiogram.types import ChatMemberUpdated, Message
+from cachetools import TTLCache
 
 from bot.services import onboarding
 
@@ -12,26 +12,16 @@ log = logging.getLogger(__name__)
 router = Router(name="new_member")
 
 # Dedup: Telegram may send both chat_member and message updates for the same join.
-# Track recently processed joins to avoid double-processing.
-_recent_joins: dict[tuple[int, int], float] = {}
-_DEDUP_WINDOW = 5.0  # seconds
+_recent_joins: TTLCache[tuple[int, int], bool] = TTLCache(maxsize=10000, ttl=5)
 
 
 async def _process_join(bot: Bot, chat_id: int, chat_title: str | None, user) -> None:
     """Common logic for processing a new member join."""
     key = (chat_id, user.id)
-    now = time.monotonic()
-
-    # Skip if already processed within the dedup window
-    if key in _recent_joins and (now - _recent_joins[key]) < _DEDUP_WINDOW:
+    if key in _recent_joins:
         log.info("Dedup: skipping duplicate join for user %d in chat %d", user.id, chat_id)
         return
-    _recent_joins[key] = now
-
-    # Evict old entries
-    cutoff = now - _DEDUP_WINDOW * 2
-    for k in [k for k, t in _recent_joins.items() if t < cutoff]:
-        del _recent_joins[k]
+    _recent_joins[key] = True
 
     log.info(
         "New member: user_id=%d username=%s chat_id=%d",

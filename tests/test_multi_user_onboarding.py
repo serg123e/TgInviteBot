@@ -58,7 +58,7 @@ async def get_member(user_id: int) -> members.GroupMember:
 @pytest_asyncio.fixture(autouse=True)
 async def setup_chat(db):
     """Create chat_settings with low min_response_length for tests."""
-    cfg = await settings.get_or_create(CHAT_ID, CHAT_TITLE)
+    await settings.get_or_create(CHAT_ID, CHAT_TITLE)
     await settings.update(CHAT_ID, min_response_length=10, timeout_minutes=15)
 
 

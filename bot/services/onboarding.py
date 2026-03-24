@@ -45,14 +45,8 @@ async def handle_new_member(
     await members.upsert_member(chat_id, user_id, username, first_name, last_name)
 
     # Send welcome message
-    from html import escape
-
-    display = escape(username) if username else (escape(first_name) if first_name else str(user_id))
-    mention = f"@{display}" if username else display
-    if "{user}" in cfg.welcome_text:
-        welcome = render(cfg.welcome_text, timeout=cfg.timeout_minutes, user=mention)
-    else:
-        welcome = f"{mention}, {render(cfg.welcome_text, timeout=cfg.timeout_minutes)}"
+    mention = user_display(username, first_name, user_id)
+    welcome = render(cfg.welcome_text, timeout=cfg.timeout_minutes, user=mention)
 
     try:
         msg = await bot.send_message(chat_id, welcome)
@@ -155,10 +149,13 @@ async def handle_timeout(bot: Bot, chat_id: int, user_id: int) -> None:
     except Exception as e:
         log.error("Failed to remove user %d from chat %d: %s", user_id, chat_id, e)
         await members.update_status(chat_id, user_id, Status.ERROR, removal_reason=str(e))
-        await notifier.notify_error(
-            bot, chat_id, cfg.chat_title, user_id, member.username, member.first_name,
-            error=str(e), admin_message_id=member.admin_message_id,
-        )
+        try:
+            await notifier.notify_error(
+                bot, chat_id, cfg.chat_title, user_id, member.username, member.first_name,
+                error=str(e), admin_message_id=member.admin_message_id,
+            )
+        except Exception as notify_err:
+            log.error("Failed to notify admin about error: %s", notify_err)
         return
 
     await members.update_status(
