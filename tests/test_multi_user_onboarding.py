@@ -48,6 +48,13 @@ async def respond(bot, user_id, text, username=None):
     )
 
 
+async def get_member(user_id: int) -> members.GroupMember:
+    """Get member from DB, assert it exists."""
+    m = await members.get_member(CHAT_ID, user_id)
+    assert m is not None, f"Member {user_id} not found in DB"
+    return m
+
+
 @pytest_asyncio.fixture(autouse=True)
 async def setup_chat(db):
     """Create chat_settings with low min_response_length for tests."""
@@ -103,7 +110,7 @@ async def test_each_user_gets_unique_admin_message_id(db, patches):
 
     ids = []
     for uid in [1001, 1002, 1003]:
-        m = await members.get_member(CHAT_ID, uid)
+        m = await get_member(uid)
         assert m is not None
         assert m.status == "prompt_sent"
         ids.append(m.admin_message_id)
@@ -119,8 +126,8 @@ async def test_response_uses_correct_admin_message_id(db, patches):
     await join(bot, 2001)
     await join(bot, 2002)
 
-    m1 = await members.get_member(CHAT_ID, 2001)
-    m2 = await members.get_member(CHAT_ID, 2002)
+    m1 = await get_member(2001)
+    m2 = await get_member(2002)
 
     await respond(bot, 2001, "Привет! Меня зовут Иван, я Python-разработчик.")
     await respond(bot, 2002, "Здравствуйте! Я Мария, менеджер проектов.")
@@ -139,10 +146,12 @@ async def test_ai_approved_sets_status_and_whitelist(db, patches):
     await join(bot, 3001)
     await respond(bot, 3001, "Меня зовут Дмитрий, я инженер, пришёл за знаниями.")
 
-    m = await members.get_member(CHAT_ID, 3001)
+    m = await get_member(3001)
+    assert m is not None
     assert m.status == "approved"
     assert m.is_whitelisted is True
     assert m.response_text == "Меня зовут Дмитрий, я инженер, пришёл за знаниями."
+    assert m.ai_validation_result is not None
     assert m.ai_validation_result["valid"] is True
 
 
@@ -155,8 +164,9 @@ async def test_ai_rejected_sets_pending_retry(db, patches):
     await join(bot, 3002)
     await respond(bot, 3002, "просто смотрю что тут за группа и для чего она")
 
-    m = await members.get_member(CHAT_ID, 3002)
+    m = await get_member(3002)
     assert m.status == "pending_retry"
+    assert m.ai_validation_result is not None
     assert m.ai_validation_result["valid"] is False
     # Timer should be rescheduled (2 calls: initial join + retry)
     assert patches["schedule"].call_count == 2
@@ -170,7 +180,7 @@ async def test_too_short_response_no_status_change(db, patches):
 
     await respond(bot, 3003, "привет")  # way below 50 chars
 
-    m = await members.get_member(CHAT_ID, 3003)
+    m = await get_member(3003)
     assert m.status == "prompt_sent"
     assert len(patches["notify_response_calls"]) == 0
 
@@ -186,14 +196,14 @@ async def test_retry_after_rejection_gets_approved(db, patches):
     patches["ai_mock"].return_value = {"valid": False, "reason": "Недостаточно информации"}
     await respond(bot, 3004, "просто посмотреть зашёл, что тут интересного вообще")
 
-    m = await members.get_member(CHAT_ID, 3004)
+    m = await get_member(3004)
     assert m.status == "pending_retry"
 
     # Second attempt: approved
     patches["ai_mock"].return_value = {"valid": True, "reason": "Хорошее представление"}
     await respond(bot, 3004, "Извините, меня зовут Олег, я дизайнер, интересует UX.")
 
-    m = await members.get_member(CHAT_ID, 3004)
+    m = await get_member(3004)
     assert m.status == "approved"
     assert m.is_whitelisted is True
 
@@ -208,7 +218,7 @@ async def test_whitelisted_user_skips_onboarding(db, patches):
     patches["ai_mock"].return_value = {"valid": True, "reason": "OK"}
     await respond(bot, 5001, "Привет! Я Анна, продукт-менеджер, интересуюсь UX.")
 
-    m = await members.get_member(CHAT_ID, 5001)
+    m = await get_member(5001)
     assert m.is_whitelisted is True
 
     # Reset call counts
@@ -229,7 +239,7 @@ async def test_concurrent_joins(db, patches):
 
     assigned = {}
     for uid in user_ids:
-        m = await members.get_member(CHAT_ID, uid)
+        m = await get_member(uid)
         assert m is not None
         assert m.status == "prompt_sent"
         assigned[uid] = m.admin_message_id
