@@ -155,6 +155,10 @@ async def handle_timeout(bot: Bot, chat_id: int, user_id: int) -> None:
     except Exception as e:
         log.error("Failed to remove user %d from chat %d: %s", user_id, chat_id, e)
         await members.update_status(chat_id, user_id, Status.ERROR, removal_reason=str(e))
+        await notifier.notify_error(
+            bot, chat_id, cfg.chat_title, user_id, member.username, member.first_name,
+            error=str(e), admin_message_id=member.admin_message_id,
+        )
         return
 
     await members.update_status(

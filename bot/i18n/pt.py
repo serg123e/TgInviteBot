@@ -14,8 +14,10 @@ MESSAGES: dict[str, str] = {
         "Novo membro em <b>{chat}</b>\nUsuário: {user}\nStatus: aguardando apresentação",
     "#Introduction {user} in <b>{chat}</b>\n\n<i>{intro}</i>\n\nAI: {status} — {reason}":
         "#Apresentação {user} em <b>{chat}</b>\n\n<i>{intro}</i>\n\nAI: {status} — {reason}",
+    "#Error {user} in <b>{chat}</b>\n{error}":
+        "#Erro {user} em <b>{chat}</b>\n{error}",
     "#Timeout {user} in <b>{chat}</b>\nDid not introduce and was removed.":
-        "#Timeout {user} em <b>{chat}</b>\nNão se apresentou e foi removido.",
+    "#Timeout {user} em <b>{chat}</b>\nNão se apresentou e foi removido.",
     "Approve": "Aprovar",
     "Remove": "Remover",
     "Ban": "Banir",

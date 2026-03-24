@@ -12,7 +12,7 @@ def test_defaults():
     assert cfg.lang == "en"
     assert cfg.bot_token == ""
     assert cfg.admin_chat_id == 0
-    assert cfg.default_timeout_minutes == 15
+    assert cfg.default_timeout_minutes == 30
     assert cfg.default_ai_validation is True
     assert cfg.default_ban_on_remove is False
 

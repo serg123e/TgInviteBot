@@ -14,6 +14,8 @@ MESSAGES: dict[str, str] = {
         "<b>{chat}</b> में नया सदस्य\nउपयोगकर्ता: {user}\nस्थिति: परिचय की प्रतीक्षा",
     "#Introduction {user} in <b>{chat}</b>\n\n<i>{intro}</i>\n\nAI: {status} — {reason}":
         "#परिचय {user} <b>{chat}</b> में\n\n<i>{intro}</i>\n\nAI: {status} — {reason}",
+    "#Error {user} in <b>{chat}</b>\n{error}":
+        "#त्रुटि {user} <b>{chat}</b> में\n{error}",
     "#Timeout {user} in <b>{chat}</b>\nDid not introduce and was removed.":
         "#समय_समाप्त {user} <b>{chat}</b> में\nपरिचय नहीं दिया और हटा दिया गया।",
     "Approve": "स्वीकृत करें",

@@ -150,7 +150,7 @@ async def test_set_whitelisted_not_found(db):
 async def test_get_or_create_new(db):
     cfg = await settings.get_or_create(100, "Test Chat")
     assert cfg.chat_id == 100
-    assert cfg.timeout_minutes == 15
+    assert cfg.timeout_minutes == 30
     assert cfg.is_active is True
     assert cfg.ai_validation_enabled is True
 
