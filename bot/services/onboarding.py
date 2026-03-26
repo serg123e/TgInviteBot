@@ -121,6 +121,12 @@ async def handle_response(
         await bot.send_message(chat_id, t("Thanks for the introduction! Welcome to the group."))
         # Auto-whitelist approved members
         await members.set_whitelisted(chat_id, user_id, True)
+        # Delete welcome prompt message
+        if member.prompt_message_id:
+            try:
+                await bot.delete_message(chat_id, member.prompt_message_id)
+            except Exception:
+                pass
     else:
         # Re-schedule removal for pending_retry — give user time to try again
         schedule_removal(chat_id, user_id, cfg.timeout_minutes, bot)
@@ -187,6 +193,12 @@ async def approve_member(bot: Bot, chat_id: int, user_id: int) -> bool:
     await members.update_status(chat_id, user_id, Status.APPROVED)
     # Auto-whitelist approved members
     await members.set_whitelisted(chat_id, user_id, True)
+    # Delete welcome prompt message
+    if member.prompt_message_id:
+        try:
+            await bot.delete_message(chat_id, member.prompt_message_id)
+        except Exception:
+            pass
     return True
 
 
