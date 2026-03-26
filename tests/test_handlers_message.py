@@ -81,10 +81,11 @@ async def test_on_group_message_no_user():
 
 @pytest.mark.asyncio
 async def test_on_non_text_message_pending_member_gets_reminder():
-    """Pending member sending media gets a text reminder."""
+    """Pending member sending media without caption gets a text reminder."""
     bot = AsyncMock()
     msg = _make_message()
     msg.content_type = ContentType.PHOTO
+    msg.caption = None
     member = MagicMock()
     member.status = "prompt_sent"
 
@@ -95,11 +96,31 @@ async def test_on_non_text_message_pending_member_gets_reminder():
 
 
 @pytest.mark.asyncio
+async def test_on_non_text_message_with_caption_triggers_onboarding():
+    """Pending member sending photo with caption triggers onboarding response."""
+    bot = AsyncMock()
+    msg = _make_message()
+    msg.content_type = ContentType.PHOTO
+    msg.caption = "Привет! Я Юрий, разработчик, интересуюсь AI и стартапами."
+    member = MagicMock()
+    member.status = "prompt_sent"
+
+    with patch("bot.handlers.message.members.get_member", return_value=member), \
+         patch("bot.handlers.message.onboarding.handle_response", new_callable=AsyncMock) as hr:
+        await on_non_text_message(msg, bot)
+
+    hr.assert_called_once()
+    assert hr.call_args.kwargs["text"] == msg.caption
+    msg.reply.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_on_non_text_message_approved_member_no_reminder():
     """Approved member sending media gets no reminder."""
     bot = AsyncMock()
     msg = _make_message()
     msg.content_type = ContentType.PHOTO
+    msg.caption = None
     member = MagicMock()
     member.status = "approved"
 

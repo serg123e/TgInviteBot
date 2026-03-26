@@ -67,13 +67,30 @@ async def on_group_message(message: Message, bot: Bot) -> None:
 
 @router.message(F.content_type.in_(MEDIA_CONTENT_TYPES), F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}))
 async def on_non_text_message(message: Message, bot: Bot) -> None:
-    """Remind pending members to write text."""
+    """Handle media from pending members: use caption as intro, or remind to write text."""
     user = message.from_user
     if not user:
         return
 
     member = await members.get_member(message.chat.id, user.id)
     if not member or member.status not in Status.RESPONDABLE:
+        return
+
+    # If media has a caption, treat it as the introduction text
+    if message.caption:
+        log.info(
+            "Onboarding response (caption) from user_id=%d in chat_id=%d",
+            user.id, message.chat.id,
+        )
+        await onboarding.handle_response(
+            bot=bot,
+            chat_id=message.chat.id,
+            chat_title=message.chat.title,
+            user_id=user.id,
+            username=user.username,
+            first_name=user.first_name,
+            text=message.caption,
+        )
         return
 
     await message.reply(
